@@ -12,9 +12,6 @@ import sys
 
 def progress(count, total, status=''):
 
-	sys.stdout.write('\x1b[1A')
-	sys.stdout.write('\x1b[2K') #retire ligne précédente
-
 	bar_len = 60
 	filled_len = int(round(bar_len * count / float(total)))
 
@@ -24,16 +21,14 @@ def progress(count, total, status=''):
 	sys.stdout.write('[%s] %s%s\t|\t%s\r' % (bar, percents, '%', status))
 	sys.stdout.flush()
 
-def write_seq(file, entity_id):
+def write_seq(file, gb_record):
 	old_stdout = sys.stdout
 	new_stdout = io.StringIO()
 	sys.stdout = new_stdout
 	function_group = []
-	with Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=entity_id) as handle:
-		gb_record = SeqIO.read(handle, "gb")
-	for f in gb_record.features:
+	features = gb_record.features
+	for f in features:
 		if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
-			function_group.append(str(f.type))
 			loc = str(f.location)
 			loc_ = loc
 			loc = loc.replace(":", " ")
@@ -68,26 +63,104 @@ def write_seq(file, entity_id):
 	output = new_stdout.getvalue()
 	print(output, file=file)
 	sys.stdout = old_stdout
-	return list(dict.fromkeys(function_group))
 
+def date_convert(date):
+	date = date.replace("JAN", "01")
+	date = date.replace("FEB", "02")
+	date = date.replace("MAR", "03")
+	date = date.replace("APR", "04")
+	date = date.replace("MAY", "05")
+	date = date.replace("JUN", "06")
+	date = date.replace("JUL", "07")
+	date = date.replace("AUG", "08")
+	date = date.replace("SEP", "09")
+	date = date.replace("OCT", "10")
+	date = date.replace("NOV", "11")
+	date = date.replace("DEC", "12")
 
-def create_file(index, split_string, entity_id, ids):
+	date = date.split("-")
+	date = date[2] + date[1] + date[0]
+	return date
+
+def update(old_date, new_date):
+	olddate = date_convert(old_date)
+	newdate = date_convert(new_date)
+	return olddate < newdate
+
+def create_file(split_string, entity_id, ids, gb_record, path):
 	# Vérifier si le dossier existe ou non : inutile si les lignes sont distinctes
-	path = 'Results'+'/'+split_string[1]+'/'+split_string[2]+'/'+split_string[3]+'/'+split_string[0]
 	function_group = ""
+	new_date = gb_record.annotations.get("date")
 	if not os.path.isdir(path):
 		os.makedirs(path)
 
 	if not os.path.isfile(path + '/' + entity_id + '.txt'):
+		date_file = open(path + '/date.dat', "a")
+		date_file.write(new_date)
+		date_file.close()
 		file = open(path + '/' + entity_id + '.txt', "a")
 	
 		ids = ids + ',' + entity_id
-		for type_ in write_seq(file, entity_id):
-			function_group = function_group + '\t' + type_
+		write_seq(file, gb_record)
 		file.close()
-		index.write(path + '/' + entity_id + '.txt' + function_group + '\n')
 
-	return (path, ids)
+	date_file = open(path + '/date.dat', "r")
+	old_date = date_file.readlines()[0]
+	date_file.close()
+
+	if update(old_date, new_date):
+		print("changing date")
+		date_file = open(path + '/date.dat', "w")
+		date_file.write(new_date)
+		date_file.close()
+		file = open(path + '/' + entity_id + '.txt', "w")
+	
+		ids = ids + ',' + entity_id
+		write_seq(file, gb_record)
+		file.close()
+
+
+def filter(index, filtre, entity_id, path):
+
+	with Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=entity_id) as handle:
+		gb_record = SeqIO.read(handle, "gb")
+
+	if os.path.isfile(path + '/date.dat'):
+		new_date = gb_record.annotations.get("date")
+		date_file = open(path + '/date.dat', "r")
+		old_date = date_file.readlines()[0]
+		date_file.close()
+		if not update(old_date, new_date):
+			return (False, gb_record)
+
+	if not os.path.isfile(path + '/date.dat'):
+
+		new_date = gb_record.annotations.get("date")
+		date_file = open(path + '/date.dat', "a")
+		date_file.write(new_date)
+		date_file.close()
+		return (False, gb_record)
+
+	function_group = []
+	functiongroup = ''
+	features = gb_record.features
+	for f in features:
+		if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
+			function_group.append(str(f.type))
+	function_group = list(dict.fromkeys(function_group))
+	for type_ in function_group:
+			functiongroup = functiongroup + '\t' + type_
+
+	index.write(path + '/' + entity_id + '.txt' + functiongroup + '\n')
+
+	if filtre[0] == '':
+		return (True, gb_record)
+	#for f in gb_record.features:
+	record = str(gb_record.features)
+	for group in filtre:
+		if not group in record:
+			return (False, gb_record)
+	return (True, gb_record)
 
 def find_ids(file, entity_name):
 	# iterate over lines, and print out line numbers which contain
@@ -97,7 +170,7 @@ def find_ids(file, entity_name):
 		if entity_name in split_string: # or word in line.split() to search for full words
 			return split_string[1]
 
-def init():
+def init(filtre=['']):
 
 	if os.path.isfile('index.txt'):
 		os.remove('index.txt')
@@ -128,32 +201,39 @@ def init():
 	count=0
 	# Itérer sur les lignes sauf la première
 
-
 	for num, line in enumerate(overview_lines[1:], 1):
-		#print(line.strip())
 		progress(num, nb_lines, status='Creating directories')
 
 		split_string = line.split("\t")
+		path = 'Results'+'/'+split_string[1]+'/'+split_string[2]+'/'+split_string[3]+'/'+split_string[0]
 		if split_string[1] == 'Archaea':
 			entity_id = find_ids(ids_files[0], split_string[0])
 			if not entity_id == None and 'NC' in entity_id:
-				(path, ids) = create_file(index, split_string, entity_id, ids)
-				count=count+1
+				(state, gb_record) = filter(index, filtre, entity_id, path)
+				if state:
+					create_file(split_string, entity_id, ids, gb_record, path)
+					count=count+1
 		if split_string[1] == 'Bacteria':
 			entity_id = find_ids(ids_files[1], split_string[0])
 			if not entity_id == None and 'NC' in entity_id:
-				(path, ids) = create_file(index, split_string, entity_id, ids)
-				count=count+1
+				(state, gb_record) = filter(index, filtre, entity_id, path)
+				if state:
+					create_file(split_string, entity_id, ids, gb_record, path)
+					count=count+1
 		if split_string[1] == 'Eukaryota':
 			entity_id = find_ids(ids_files[2], split_string[0])
 			if not entity_id == None and 'NC' in entity_id:
-				(path, ids) = create_file(index, split_string, entity_id, ids)
-				count=count+1
+				(state, gb_record) = filter(index, filtre, entity_id, path)
+				if state:
+					create_file(split_string, entity_id, ids, gb_record, path)
+					count=count+1
 		if split_string[1] == 'Viruses':
 			entity_id = find_ids(ids_files[3], split_string[0])
 			if not entity_id == None and 'NC' in entity_id:
-				(path, ids) = create_file(index, split_string, entity_id, ids)
-				count=count+1
+				(state, gb_record) = filter(index, filtre, entity_id, path)
+				if state:
+					create_file(split_string, entity_id, ids, gb_record, path)
+					count=count+1
 
 	index.close()
 
