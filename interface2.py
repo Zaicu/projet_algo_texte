@@ -1,7 +1,9 @@
 import sys
 import os
+import time
 import platform
 import inspect
+import threading
 from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel
 from PyQt5.QtCore import QModelIndex
 src_file_path = inspect.getfile(lambda: None)
@@ -31,7 +33,7 @@ class FileSystemView(QWidget):
         self.tree.setRootIndex(self.model.index(dir))
         self.tree.setColumnWidth(0, 250)
         self.tree.setAlternatingRowColors(True)
-
+        self.tree.setStyleSheet("background-color:slategray; alternate-background-color:lightslategray; border-radius:5px")
         layout = QVBoxLayout()
         layout.addWidget(self.tree)
         self.setLayout(layout)
@@ -80,12 +82,20 @@ class Button(QWidget):
         entree.setCheckable(True)
 
         entree.clicked.connect(self.parse)
+        entree.setStyleSheet("margin: 1px; padding: 10px; \
+                           background-color: lightgray; \
+                           border-style: solid; \
+                           border-radius: 4px; border-width: 3px; \
+                           border-color: slategray;")
         layout = QVBoxLayout()
         layout.addWidget(entree)
         self.setLayout(layout)
     def parse(self) :
         if(tree.path != "blank"):
             logs.write(tree.path+ " - ",menu_regions.content)
+        th = threading.Thread(target=init,args=([menu_regions.content],root_dir))
+        th.start()
+        #init(menu_regions.content,root_dir)
 
 
 class Button_init(QWidget):
@@ -93,17 +103,23 @@ class Button_init(QWidget):
         super().__init__()
 
 
-        entree = QPushButton('Init', self)
-        entree.setCheckable(True)
+        self.entree = QPushButton('Init', self)
+        self.entree.setCheckable(True)
 
-        entree.clicked.connect(self.initialisation)
+        self.entree.clicked.connect(self.initialisation)
+        self.entree.setStyleSheet("margin: 1px; padding: 10px; \
+                           background-color: lightgray; \
+                           border-style: solid; \
+                           border-radius: 4px; border-width: 3px; \
+                           border-color: slategray;")
         layout = QVBoxLayout()
-        layout.addWidget(entree)
+        layout.addWidget(self.entree)
         self.setLayout(layout)
     def initialisation(self) :
-        print("appel avec root dir =", root_dir)
+
         logs.write('',"Initialisation")
-        init(dir=root_dir)
+        th_init.start()
+        #init(dir=root_dir)
 
 
 class Logs(QWidget):
@@ -127,6 +143,7 @@ class Logs(QWidget):
 
 
 if __name__ == '__main__':
+    th_init = threading.Thread(target=init,args=([],root_dir))
     if not os.path.isdir(root_dir + SEP+ "GENOME_REPORTS"):
         os.makedirs(root_dir + SEP+ "GENOME_REPORTS")
     if not os.path.isdir(root_dir + SEP + "Results"):
