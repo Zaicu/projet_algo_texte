@@ -193,8 +193,10 @@ def create_tree(overview_lines, ids_files, root_dir):
 		progress(num, nb_lines, status='Creating directories')
 
 		split_string = line.split("\t")
-		path = (root_dir.replace(SEP+"GENOME_REPORTS",'').replace("GENOME_REPORTS",'')+ SEP+'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')
-
+		if root_dir == "GENOME_REPORTS":
+			path = ('Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')
+		else :
+			path = root_dir.replace(SEP+"GENOME_REPORTS",'').replace("GENOME_REPORTS",'')+( SEP+'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')
 		if not os.path.isdir(path):
 			if split_string[1] == 'Archaea':
 				kingdom = 0
@@ -208,7 +210,7 @@ def create_tree(overview_lines, ids_files, root_dir):
 			if kingdom == 0 or kingdom == 1 or kingdom == 2 or kingdom == 3:
 				entity_id = str(find_ids(ids_files[kingdom], split_string[0]))
 
-			if not entity_id == "None":
+			if not entity_id == None:
 				os.makedirs(path)
 				file = open(path + SEP + entity_id + '.txt', "a")
 				ids = ids + entity_id + ","
@@ -283,6 +285,7 @@ def init(filtre=[''],dir=""):
 		sys.stdout.flush()
 	else :
 		dirPath = "GENOME_REPORTS"
+	print("dir path :",dirPath)
 	dirIds = dirPath + SEP + "IDS"
 	#download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/overview.txt",dirPath)
 	#download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Archaea.ids",dirIds)
