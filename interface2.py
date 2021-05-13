@@ -1,13 +1,16 @@
 import sys
 import os
+import platform
 import inspect
 from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel
 from PyQt5.QtCore import QModelIndex
-
+from parsing2 import *
 src_file_path = inspect.getfile(lambda: None)
+
 
 class FileSystemView(QWidget):
 	def __init__(self, dir_path):
+	    self.path = "blank"
 		super().__init__()
 		appWidth = 800
 		appHeight = 300
@@ -25,6 +28,19 @@ class FileSystemView(QWidget):
 		layout = QVBoxLayout()
 		layout.addWidget(self.tree)
 		self.setLayout(layout)
+
+		self.tree.clicked.connect(self.test)
+
+    def test(self, signal):
+        self.content=self.tree.model().fileName(signal)
+        dirPath2= dirPath.replace('\\','/')
+        path1 = self.tree.model().filePath(signal)
+        path2 = path1.replace(dirPath2,'')
+        if platform.system()=='Windows':
+            self.path = path2.replace("/","\\")
+        else :
+            self.path = path2
+
 
 class Menu(QWidget):
     def __init__(self,list):
@@ -61,7 +77,8 @@ class Button(QWidget):
 		layout.addWidget(entree)
 		self.setLayout(layout)
 	def parse(self) :
-		logs.write(menu_kingdom.content,menu_regions.content)
+	    if(tree.path != "blank"):
+            logs.write(tree.path,menu_regions.content)
 
 class Logs(QWidget):
     def __init__(self):
@@ -90,16 +107,16 @@ if __name__ == '__main__':
 
 	str = os.path.dirname(os.path.realpath(src_file_path))
 	dirPath = str+r'\Test'
-
+    sys.path.append(str)
 	tree = FileSystemView(dirPath)
-	menu_kingdom = Menu(["Eucaryota", "Bacteria", "Archaea","Virus","Plasmides", "Organelle"])
+	#menu_kingdom = Menu(["Eucaryota", "Bacteria", "Archaea","Virus","Plasmides", "Organelle"])
 	menu_regions = Menu(["CDS", "Intron", "Télomère"])
 	logs = Logs()
-	button = Button(menu_kingdom, menu_regions)
+	button = Button(tree, menu_regions)
 
 	grid.addWidget(tree,1,1,5,1)
 	grid.addWidget(logs,3,2,2,2)
-	grid.addWidget(menu_kingdom,1,2)
+	#grid.addWidget(menu_kingdom,1,2)
 	grid.addWidget(menu_regions,1,3)
 	grid.addWidget(button,2,3)
 
