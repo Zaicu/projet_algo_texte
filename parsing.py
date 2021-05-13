@@ -5,6 +5,7 @@ from Bio.Seq import Seq
 from Bio import Entrez
 
 import re
+import urllib.request
 import io
 import os.path
 import sys
@@ -13,6 +14,29 @@ import platform
 if platform.system() == "Windows": SEP = "\\"
 else: SEP = "/"
 
+def download_file(url, dir):
+	if not os.path.isdir(dir):
+		os.makedirs(dir)
+	file_name = dir + SEP + url.split('/')[-1]
+	u = urllib.request.urlopen(url)
+	f = open(file_name, 'wb')
+	meta = u.info()
+	file_size = int(meta.get_all("Content-Length")[0])
+	print("Downloading: %s Bytes: %s" % (file_name, file_size))
+
+	file_size_dl = 0
+	block_sz = 8192
+	while True:
+		buffer = u.read(block_sz)
+		if not buffer:
+			break
+		file_size_dl += len(buffer)
+		f.write(buffer)
+		status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
+		status = status + chr(8)*(len(status)+1)
+		print(status)
+		
+	f.close()
 
 def progress(count, total, status=''):
 
@@ -25,6 +49,25 @@ def progress(count, total, status=''):
 	sys.stdout.write('[%s] %s%s\t|\t%s\r' % (bar, percents, '%', status))
 	sys.stdout.flush()
 
+def parse_location(location):
+	loc = location.replace(":", " ")
+	loc = loc.replace("[", "")
+	loc = loc.replace("]", "")
+	loc = loc.replace("(", "")
+	loc = loc.replace(")", "")
+	loc = loc.replace("-", "")
+	loc = loc.replace("+", "")
+	loc = loc.replace("join", "")
+	loc = loc.replace("complement", "")
+	loc = loc.replace("{", "")
+	loc = loc.replace("}", "")
+	loc = loc.replace(",", "")
+	loc = loc.replace(">", "")
+	loc = loc.replace("<", "")
+	loc = loc.replace("order", "")
+	return loc
+
+
 def write_seq(file, gb_record):
 	old_stdout = sys.stdout
 	new_stdout = io.StringIO()
@@ -34,41 +77,26 @@ def write_seq(file, gb_record):
 	for f in features:
 		if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
 			loc = str(f.location)
-			loc_ = loc
-			loc = loc.replace(":", " ")
-			loc = loc.replace("[", "")
-			loc = loc.replace("]", "")
-			loc = loc.replace("(", "")
-			loc = loc.replace(")", "")
-			loc = loc.replace("-", "")
-			loc = loc.replace("+", "")
-			loc = loc.replace("join", "")
-			loc = loc.replace("complement", "")
-			loc = loc.replace("{", "")
-			loc = loc.replace("}", "")
-			loc = loc.replace(",", "")
-			loc = loc.replace(">", "")
-			loc = loc.replace("<", "")
-			loc = loc.replace("order", "")
-			coord = loc.split(' ')
+			loc = loc.split(' ')
+			coord = parse_location(loc)
 			int_coord = []
 			for num in coord:
 				int_coord.append(int(num))
-			if not "join" in loc_ and not "complement" in loc_:
+			if not "join" in loc and not "complement" in loc:
 				inf, sup = min(int_coord), max(int_coord)
 				print("%s\t%d..%d" % (f.type, inf, sup))
 				print(gb_record.seq[inf:sup] + '\n')
-			if "complement" in loc_ and not "join" in loc_:
+			if "complement" in loc and not "join" in loc:
 				inf, sup = min(int_coord), max(int_coord)
 				print("%s\tcomplement(%d..%d)" % (f.type, inf, sup))
 				print(gb_record.seq[inf:sup] + '\n')
-			if "join" in loc_:
+			if "join" in loc:
 				join(int_coord, gb_record.seq, f, file)
 	output = new_stdout.getvalue()
 	print(output, file=file)
 	sys.stdout = old_stdout
 
-def date_convert(date):
+def date_convert(date): #mettre la date dans un format exploitable afin de les comparer numériquement
 	date = date.replace("JAN", "01")
 	date = date.replace("FEB", "02")
 	date = date.replace("MAR", "03")
@@ -86,7 +114,7 @@ def date_convert(date):
 	date = date[2] + date[1] + date[0]
 	return date
 
-def update(old_date, new_date):
+def update(old_date, new_date): #compare les dates et renvoie un booléen correspondant au devoir de mise à jour
 	olddate = date_convert(old_date)
 	newdate = date_convert(new_date)
 	return olddate < newdate
@@ -113,7 +141,6 @@ def create_file(split_string, entity_id, ids, gb_record, path):
 	date_file.close()
 
 	if update(old_date, new_date):
-		print("changing date")
 		date_file = open(path + SEP + 'date.dat', "w")
 		date_file.write(new_date)
 		date_file.close()
@@ -123,12 +150,36 @@ def create_file(split_string, entity_id, ids, gb_record, path):
 		write_seq(file, gb_record)
 		file.close()
 
+def create_tree(overview_lines, ids_files):
+
+	nb_lines = len(overview_lines)
+	for num, line in enumerate(overview_lines[1:], 1):
+		progress(num, nb_lines, status='Creating directories')
+
+		split_string = line.split("\t")
+		path = 'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]
+
+		if not os.path.isdir(path):
+			if split_string[1] == 'Archaea':
+				kingdom = 0
+			if split_string[1] == 'Bacteria':
+				kingdom = 1
+			if split_string[1] == 'Eukaryota':
+				kingdom = 2
+			if split_string[1] == 'Viruses':
+				kingdom = 3
+
+			if kingdom == 0 or kingdom == 1 or kingdom == 2 or kingdom == 3:
+				entity_id = str(find_ids(ids_files[kingdom], split_string[0]))
+
+			if not entity_id == None:
+				os.makedirs(path)
+				file = open(path + SEP + entity_id + '.txt', "a")
+				file.close()
+
+
 
 def filter(index, filtre, entity_id, path):
-
-	handle = Entrez.einfo(db="pubmed")
-	record = Entrez.read(handle)
-	print(record["DbInfo"]["LastUpdate"])
 
 	with Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=entity_id) as handle:
 		gb_record = SeqIO.read(handle, "gb")
@@ -180,6 +231,15 @@ def find_ids(file, entity_name):
 
 def init(filtre=['']):
 
+	#base = os.path.dirname(os.path.realpath(src_file_path))
+	dirPath = "GENOME_REPORTS"
+	dirIds = dirPath + SEP + "IDS"
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/overview.txt",dirPath)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Archaea.ids",dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Bacteria.ids",dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Eukaryota.ids",dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Viruses.ids",dirIds)
+
 	if os.path.isfile('index.txt'):
 		os.remove('index.txt')
 	# Ouvrir le fichier en lecture seule
@@ -207,41 +267,33 @@ def init(filtre=['']):
 	nb_lines = len(overview_lines)
 	ids = ''
 	count=0
+	kingdom = -1
+
+	create_tree(overview_lines, ids_files)
 	# Itérer sur les lignes sauf la première
 
-	for num, line in enumerate(overview_lines[1:], 1):
-		progress(num, nb_lines, status='Creating directories')
+	#for num, line in enumerate(overview_lines[1:], 1):
 
-		split_string = line.split("\t")
-		path = 'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]
-		if split_string[1] == 'Archaea':
-			entity_id = find_ids(ids_files[0], split_string[0])
-			if not entity_id == None and 'NC' in entity_id:
-				(state, gb_record) = filter(index, filtre, entity_id, path)
-				if state:
-					create_file(split_string, entity_id, ids, gb_record, path)
-					count=count+1
-		if split_string[1] == 'Bacteria':
-			entity_id = find_ids(ids_files[1], split_string[0])
-			if not entity_id == None and 'NC' in entity_id:
-				(state, gb_record) = filter(index, filtre, entity_id, path)
-				if state:
-					create_file(split_string, entity_id, ids, gb_record, path)
-					count=count+1
-		if split_string[1] == 'Eukaryota':
-			entity_id = find_ids(ids_files[2], split_string[0])
-			if not entity_id == None and 'NC' in entity_id:
-				(state, gb_record) = filter(index, filtre, entity_id, path)
-				if state:
-					create_file(split_string, entity_id, ids, gb_record, path)
-					count=count+1
-		if split_string[1] == 'Viruses':
-			entity_id = find_ids(ids_files[3], split_string[0])
-			if not entity_id == None and 'NC' in entity_id:
-				(state, gb_record) = filter(index, filtre, entity_id, path)
-				if state:
-					create_file(split_string, entity_id, ids, gb_record, path)
-					count=count+1
+	#	split_string = line.split("\t")
+	#	path = 'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]
+
+
+		#if split_string[1] == 'Archaea':
+		#	kingdom = 0
+		#if split_string[1] == 'Bacteria':
+		#	kingdom = 1
+		#if split_string[1] == 'Eukaryota':
+		#	kingdom = 2
+		#if split_string[1] == 'Viruses':
+		#	kingdom = 3
+
+		#if kingdom == 0 or kingdom == 1 or kingdom == 2 or kingdom == 3:
+		#	entity_id = find_ids(ids_files[kingdom], split_string[0])
+		#	if not entity_id == None and 'NC' in entity_id:
+		#		(state, gb_record) = filter(index, filtre, entity_id, path)
+		#		if state:
+		#			create_file(split_string, entity_id, ids, gb_record, path)
+		#			count=count+1
 
 	index.close()
 
@@ -250,19 +302,7 @@ def join(coord, sequence, f, file=''):
 	new_stdout = io.StringIO()
 	sys.stdout = new_stdout
 	l = len(coord)
-	loc = str(f.location)
-	loc = loc.replace(":", "..")
-	loc = loc.replace("[", "")
-	loc = loc.replace("]", "")
-	loc = loc.replace("(", "")
-	loc = loc.replace(")", "")
-	loc = loc.replace("-", "")
-	loc = loc.replace("+", "")
-	loc = loc.replace("{", "(")
-	loc = loc.replace("}", ")")
-	loc = loc.replace(">", "")
-	loc = loc.replace("<", "")
-	loc = loc.replace("order", "")
+	loc = parse_location(str(f.location))
 	string = ""
 	for i in range(round(l/2)):
 		inf = coord[2*i]
@@ -277,8 +317,7 @@ def join(coord, sequence, f, file=''):
 ## --------------------------------------------------------------------------- ##
 
 Entrez.email = "thomas18199@hotmail.fr"
-#init()
-print(SEP)
+init()
 
 
 
