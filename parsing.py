@@ -8,6 +8,10 @@ import re
 import io
 import os.path
 import sys
+import platform
+
+if platform.system() == "Windows": SEP = "\\"
+else: SEP = "/"
 
 
 def progress(count, total, status=''):
@@ -94,26 +98,26 @@ def create_file(split_string, entity_id, ids, gb_record, path):
 	if not os.path.isdir(path):
 		os.makedirs(path)
 
-	if not os.path.isfile(path + '/' + entity_id + '.txt'):
-		date_file = open(path + '/date.dat', "a")
+	if not os.path.isfile(path + SEP + entity_id + '.txt'):
+		date_file = open(path + SEP + 'date.dat', "a")
 		date_file.write(new_date)
 		date_file.close()
-		file = open(path + '/' + entity_id + '.txt', "a")
+		file = open(path + SEP + entity_id + '.txt', "a")
 	
 		ids = ids + ',' + entity_id
 		write_seq(file, gb_record)
 		file.close()
 
-	date_file = open(path + '/date.dat', "r")
+	date_file = open(path + SEP + 'date.dat', "r")
 	old_date = date_file.readlines()[0]
 	date_file.close()
 
 	if update(old_date, new_date):
 		print("changing date")
-		date_file = open(path + '/date.dat', "w")
+		date_file = open(path + SEP + 'date.dat', "w")
 		date_file.write(new_date)
 		date_file.close()
-		file = open(path + '/' + entity_id + '.txt', "w")
+		file = open(path + SEP + entity_id + '.txt', "w")
 	
 		ids = ids + ',' + entity_id
 		write_seq(file, gb_record)
@@ -122,21 +126,25 @@ def create_file(split_string, entity_id, ids, gb_record, path):
 
 def filter(index, filtre, entity_id, path):
 
+	handle = Entrez.einfo(db="pubmed")
+	record = Entrez.read(handle)
+	print(record["DbInfo"]["LastUpdate"])
+
 	with Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=entity_id) as handle:
 		gb_record = SeqIO.read(handle, "gb")
 
-	if os.path.isfile(path + '/date.dat'):
+	if os.path.isfile(path + SEP + 'date.dat'):
 		new_date = gb_record.annotations.get("date")
-		date_file = open(path + '/date.dat', "r")
+		date_file = open(path + SEP + 'date.dat', "r")
 		old_date = date_file.readlines()[0]
 		date_file.close()
 		if not update(old_date, new_date):
 			return (False, gb_record)
 
-	if not os.path.isfile(path + '/date.dat'):
+	if not os.path.isfile(path + SEP + 'date.dat'):
 
 		new_date = gb_record.annotations.get("date")
-		date_file = open(path + '/date.dat', "a")
+		date_file = open(path + SEP + 'date.dat', "a")
 		date_file.write(new_date)
 		date_file.close()
 		return (False, gb_record)
@@ -151,7 +159,7 @@ def filter(index, filtre, entity_id, path):
 	for type_ in function_group:
 			functiongroup = functiongroup + '\t' + type_
 
-	index.write(path + '/' + entity_id + '.txt' + functiongroup + '\n')
+	index.write(path + SEP + entity_id + '.txt' + functiongroup + '\n')
 
 	if filtre[0] == '':
 		return (True, gb_record)
@@ -205,7 +213,7 @@ def init(filtre=['']):
 		progress(num, nb_lines, status='Creating directories')
 
 		split_string = line.split("\t")
-		path = 'Results'+'/'+split_string[1]+'/'+split_string[2]+'/'+split_string[3]+'/'+split_string[0]
+		path = 'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]
 		if split_string[1] == 'Archaea':
 			entity_id = find_ids(ids_files[0], split_string[0])
 			if not entity_id == None and 'NC' in entity_id:
@@ -269,7 +277,8 @@ def join(coord, sequence, f, file=''):
 ## --------------------------------------------------------------------------- ##
 
 Entrez.email = "thomas18199@hotmail.fr"
-init()
+#init()
+print(SEP)
 
 
 
