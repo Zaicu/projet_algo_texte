@@ -11,7 +11,7 @@ root_dir = os.path.dirname(os.path.realpath(src_file_path))
 dir = root_dir+r'\Test'
 print(root_dir)
 sys.path.append(root_dir)
-from parsing import *
+from parsing3 import *
 
 if platform.system() == "Windows": SEP = "\\"
 else: SEP = "/"
@@ -93,9 +93,10 @@ class Button(QWidget):
     def parse(self) :
         if(tree.path != "blank"):
             logs.write(tree.path+ " - ",menu_regions.content)
-        th = threading.Thread(target=init,args=([menu_regions.content],root_dir))
-        th.start()
-        #init(menu_regions.content,root_dir)
+        #th = threading.Thread(target=init,args=([menu_regions.content],root_dir))
+        #th.start()
+        #th.join()
+        init(menu_regions.content,root_dir)
 
 
 class Button_init(QWidget):
@@ -116,10 +117,12 @@ class Button_init(QWidget):
         layout.addWidget(self.entree)
         self.setLayout(layout)
     def initialisation(self) :
-
         logs.write('',"Initialisation")
-        th_init.start()
-        #init(dir=root_dir)
+        #th_init = threading.Thread(target=init,args=([],root_dir))
+        #th_init.start()
+        #th_init.join()
+
+        init(dir=root_dir)
 
 
 class Logs(QWidget):
@@ -143,7 +146,6 @@ class Logs(QWidget):
 
 
 if __name__ == '__main__':
-    th_init = threading.Thread(target=init,args=([],root_dir))
     if not os.path.isdir(root_dir + SEP+ "GENOME_REPORTS"):
         os.makedirs(root_dir + SEP+ "GENOME_REPORTS")
     if not os.path.isdir(root_dir + SEP + "Results"):
