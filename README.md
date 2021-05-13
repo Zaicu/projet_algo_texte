@@ -7,6 +7,6 @@ pip install Bio
 ```
 
 Pour lancer le projet faire :
-`python interface2.py` dans le terminal Windows, dans le répertoire du projet
+`python interface.py` dans le terminal Windows, dans le répertoire du projet
 
 
