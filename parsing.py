@@ -1,12 +1,13 @@
 from Bio import SeqIO
-from Bio.SeqIO import parse 
-from Bio.SeqRecord import SeqRecord 
+from Bio.SeqIO import parse
+from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 from Bio import Entrez
 
 import re
 import urllib.request
 import io
+import os
 import os.path
 import sys
 import platform
@@ -34,9 +35,9 @@ def download_file(url, dir):
 		f.write(buffer)
 		status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
 		status = status + chr(8)*(len(status)+1)
-		sys.stdout.write('%s' % (status))
-		sys.stdout.flush()
-		
+		#sys.stdout.write('%s' % (status))
+		#sys.stdout.flush()
+
 	f.close()
 
 def progress(count, total, status=''):
@@ -122,6 +123,7 @@ def update(old_date, new_date): #compare les dates et renvoie un booléen corres
 
 def create_file(split_string, entity_id, ids, gb_record, path):
 	# Vérifier si le dossier existe ou non : inutile si les lignes sont distinctes
+
 	function_group = ""
 	new_date = gb_record.annotations.get("date")
 	if not os.path.isdir(path):
@@ -132,7 +134,7 @@ def create_file(split_string, entity_id, ids, gb_record, path):
 		date_file.write(new_date)
 		date_file.close()
 		file = open(path + SEP + entity_id + '.txt', "a")
-	
+
 		ids = ids + ',' + entity_id
 		write_seq(file, gb_record)
 		file.close()
@@ -146,20 +148,19 @@ def create_file(split_string, entity_id, ids, gb_record, path):
 		date_file.write(new_date)
 		date_file.close()
 		file = open(path + SEP + entity_id + '.txt', "w")
-	
+
 		ids = ids + ',' + entity_id
 		write_seq(file, gb_record)
 		file.close()
 
-def create_tree(overview_lines, ids_files):
+def create_tree(overview_lines, ids_files, root_dir):
 
 	nb_lines = len(overview_lines)
 	for num, line in enumerate(overview_lines[1:], 1):
 		progress(num, nb_lines, status='Creating directories')
 
 		split_string = line.split("\t")
-		path = 'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]
-
+		path = (root_dir.replace(SEP+"GENOME_REPORTS",'').replace("GENOME_REPORTS",'')+ SEP+'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')
 		if not os.path.isdir(path):
 			if split_string[1] == 'Archaea':
 				kingdom = 0
@@ -230,11 +231,17 @@ def find_ids(file, entity_name):
 		if entity_name in split_string: # or word in line.split() to search for full words
 			return split_string[1]
 
-def init(filtre=['']):
+def init(filtre=[''],dir=[]):
 
 	#base = os.path.dirname(os.path.realpath(src_file_path))
-	dirPath = "GENOME_REPORTS"
+	if platform.system() == "Windows":
+		#base = os.path.dirname(os.path.realpath(dir))
+		dirPath = dir + SEP + "GENOME_REPORTS"
+		sys.stdout.flush()
+	else :
+		dirPath = "GENOME_REPORTS"
 	dirIds = dirPath + SEP + "IDS"
+
 	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/overview.txt",dirPath)
 	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Archaea.ids",dirIds)
 	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Bacteria.ids",dirIds)
@@ -270,7 +277,7 @@ def init(filtre=['']):
 	count=0
 	kingdom = -1
 
-	create_tree(overview_lines, ids_files)
+	create_tree(overview_lines, ids_files, dirPath)
 	# Itérer sur les lignes sauf la première
 
 	#for num, line in enumerate(overview_lines[1:], 1):
@@ -318,7 +325,7 @@ def join(coord, sequence, f, file=''):
 ## --------------------------------------------------------------------------- ##
 
 Entrez.email = "thomas18199@hotmail.fr"
-init()
+#init()
 
 
 
