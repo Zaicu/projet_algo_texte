@@ -11,7 +11,7 @@ root_dir = os.path.dirname(os.path.realpath(src_file_path))
 dir = root_dir+r'\Test'
 print(root_dir)
 sys.path.append(root_dir)
-from parsing3 import *
+from parsing import *
 
 if platform.system() == "Windows": SEP = "\\"
 else: SEP = "/"
@@ -96,7 +96,7 @@ class Button(QWidget):
         #th = threading.Thread(target=init,args=([menu_regions.content],root_dir))
         #th.start()
         #th.join()
-        init(menu_regions.content,root_dir)
+        init(menu_regions.content)
 
 
 class Button_init(QWidget):
@@ -122,7 +122,7 @@ class Button_init(QWidget):
         #th_init.start()
         #th_init.join()
 
-        init(dir=root_dir)
+        init()
 
 
 class Logs(QWidget):
