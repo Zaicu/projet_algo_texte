@@ -1,9 +1,11 @@
 from Bio import SeqIO
-from Bio.SeqIO import parse 
-from Bio.SeqRecord import SeqRecord 
+from Bio.SeqIO import parse
+from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 from Bio import Entrez
 
+import os
+import sys
 import re
 import io
 import os.path
@@ -13,6 +15,30 @@ import platform
 if platform.system() == "Windows": SEP = "\\"
 else: SEP = "/"
 
+def download_file(url, dir):
+    if not os.path.isdir(dir):
+        os.makedirs(dir)
+    file_name = dir+ SEP + url.split('/')[-1]
+    u = urllib.request.urlopen(url)
+    f = open(file_name, 'wb')
+    meta = u.info()
+    file_size = int(meta.get_all("Content-Length")[0])
+    print("Downloading: %s Bytes: %s" % (file_name, file_size))
+
+    file_size_dl = 0
+    block_sz = 8192
+    while True:
+        buffer = u.read(block_sz)
+        if not buffer:
+            break
+
+        file_size_dl += len(buffer)
+        f.write(buffer)
+        status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
+        status = status + chr(8)*(len(status)+1)
+        print(status)
+
+    f.close()
 
 def progress(count, total, status=''):
 
@@ -103,7 +129,7 @@ def create_file(split_string, entity_id, ids, gb_record, path):
 		date_file.write(new_date)
 		date_file.close()
 		file = open(path + SEP + entity_id + '.txt', "a")
-	
+
 		ids = ids + ',' + entity_id
 		write_seq(file, gb_record)
 		file.close()
@@ -118,14 +144,13 @@ def create_file(split_string, entity_id, ids, gb_record, path):
 		date_file.write(new_date)
 		date_file.close()
 		file = open(path + SEP + entity_id + '.txt', "w")
-	
+
 		ids = ids + ',' + entity_id
 		write_seq(file, gb_record)
 		file.close()
 
 
 def filter(index, filtre, entity_id, path):
-
 	handle = Entrez.einfo(db="pubmed")
 	record = Entrez.read(handle)
 	print(record["DbInfo"]["LastUpdate"])
@@ -140,10 +165,10 @@ def filter(index, filtre, entity_id, path):
 		date_file.close()
 		if not update(old_date, new_date):
 			return (False, gb_record)
-
 	if not os.path.isfile(path + SEP + 'date.dat'):
 
 		new_date = gb_record.annotations.get("date")
+
 		date_file = open(path + SEP + 'date.dat', "a")
 		date_file.write(new_date)
 		date_file.close()
@@ -180,14 +205,23 @@ def find_ids(file, entity_name):
 
 def init(filtre=['']):
 
+	str = os.path.dirname(os.path.realpath(src_file_path))
+	dirPath = str+SEP+"GENOME_REPORTS"
+	dirIds = dirPath + SEP + "IDS"
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/overview.txt",dirPath)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Archaea.ids",dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Bacteria.ids",dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Eukaryota.ids",dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Viruses.ids",dirIds)
+
 	if os.path.isfile('index.txt'):
 		os.remove('index.txt')
 	# Ouvrir le fichier en lecture seule
-	overview = open('GENOME_REPORTS/overview.txt', "r")
-	archaea_ids = open('GENOME_REPORTS/IDS/Archaea.ids', "r")
-	bacteria_ids = open('GENOME_REPORTS/IDS/Bacteria.ids', "r")
-	eukaryota_ids = open('GENOME_REPORTS/IDS/Eukaryota.ids', "r")
-	viruses_ids = open('GENOME_REPORTS/IDS/Viruses.ids', "r")
+	overview = open(dirPath + SEP + 'overview.txt', "r")
+	archaea_ids = open(dirIds + SEP + 'Archaea.ids', "r")
+	bacteria_ids = open(dirIds + SEP + 'Bacteria.ids', "r")
+	eukaryota_ids = open(dirIds + SEP + 'Eukaryota.ids', "r")
+	viruses_ids = open(dirIds + SEP + 'Viruses.ids', "r")
 	# utiliser readlines pour lire toutes les lignes du fichier
 	# La variable "lignes" est une liste contenant toutes les lignes du fichier
 	overview_lines = overview.readlines()
@@ -213,7 +247,9 @@ def init(filtre=['']):
 		progress(num, nb_lines, status='Creating directories')
 
 		split_string = line.split("\t")
-		path = 'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]
+		path = dirPath +SEP + 'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]
+		print(path)
+		sys.stdout.flush()
 		if split_string[1] == 'Archaea':
 			entity_id = find_ids(ids_files[0], split_string[0])
 			if not entity_id == None and 'NC' in entity_id:
@@ -277,7 +313,7 @@ def join(coord, sequence, f, file=''):
 ## --------------------------------------------------------------------------- ##
 
 Entrez.email = "thomas18199@hotmail.fr"
-#init()
+init()
 print(SEP)
 
 
