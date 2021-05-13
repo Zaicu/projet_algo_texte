@@ -183,7 +183,7 @@ def associate(ids, path):
 
 
 
-def create_tree(overview_lines, ids_files):
+def create_tree(overview_lines, ids_files, root_dir):
 
 	ids = ""
 	pathes = ""
@@ -291,11 +291,11 @@ def init(filtre=['']):
 	#download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Viruses.ids",dirIds)
 
 	# Ouvrir le fichier en lecture seule
-	overview = open('GENOME_REPORTS/overview.txt', "r")
-	archaea_ids = open('GENOME_REPORTS/IDS/Archaea.ids', "r")
-	bacteria_ids = open('GENOME_REPORTS/IDS/Bacteria.ids', "r")
-	eukaryota_ids = open('GENOME_REPORTS/IDS/Eukaryota.ids', "r")
-	viruses_ids = open('GENOME_REPORTS/IDS/Viruses.ids', "r")
+	overview = open(dirPath+SEP+'overview.txt', "r")
+	archaea_ids = open(dirIds + SEP +'Archaea.ids', "r")
+	bacteria_ids = open(dirIds+SEP+'Bacteria.ids', "r")
+	eukaryota_ids = open(dirIds+ SEP+ 'Eukaryota.ids', "r")
+	viruses_ids = open(dirIds+ SEP+ 'Viruses.ids', "r")
 	# utiliser readlines pour lire toutes les lignes du fichier
 	# La variable "lignes" est une liste contenant toutes les lignes du fichier
 	overview_lines = overview.readlines()
@@ -316,7 +316,7 @@ def init(filtre=['']):
 	count=0
 	kingdom = -1
 
-	create_tree(overview_lines, ids_files)
+	create_tree(overview_lines, ids_files, dirPath)
 	# Itérer sur les lignes sauf la première
 
 	#for num, line in enumerate(overview_lines[1:], 1):
