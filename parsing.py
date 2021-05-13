@@ -218,8 +218,8 @@ def create_tree(overview_lines, ids_files, root_dir):
 
 				file.close()
 
-	if not ids == "":
-		associate(ids, pathes)
+	#if not ids == "":
+	#	associate(ids, pathes)
 
 
 
@@ -274,10 +274,10 @@ def find_ids(file, entity_name):
 		if entity_name in split_string: # or word in line.split() to search for full words
 			return split_string[1]
 
-def init(filtre=[''],dir=[]):
+def init(filtre=[''],dir=""):
 
 	#base = os.path.dirname(os.path.realpath(src_file_path))
-	if platform.system() == "Windows":
+	if platform.system() == "Windows" and dir!="":
 		#base = os.path.dirname(os.path.realpath(dir))
 		dirPath = dir + SEP + "GENOME_REPORTS"
 		sys.stdout.flush()
@@ -289,7 +289,7 @@ def init(filtre=[''],dir=[]):
 	#download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Bacteria.ids",dirIds)
 	#download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Eukaryota.ids",dirIds)
 	#download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Viruses.ids",dirIds)
-
+	print(dirPath)
 	# Ouvrir le fichier en lecture seule
 	overview = open(dirPath+SEP+'overview.txt', "r")
 	archaea_ids = open(dirIds + SEP +'Archaea.ids', "r")
