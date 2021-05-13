@@ -274,7 +274,7 @@ def find_ids(file, entity_name):
 		if entity_name in split_string: # or word in line.split() to search for full words
 			return split_string[1]
 
-def init(filtre=['']):
+def init(filtre=[''],dir=[]):
 
 	#base = os.path.dirname(os.path.realpath(src_file_path))
 	if platform.system() == "Windows":
@@ -363,4 +363,4 @@ def join(coord, sequence, f, file=''):
 ## --------------------------------------------------------------------------- ##
 
 Entrez.email = "thmslpn@gmail.com"
-init()
+#init()
