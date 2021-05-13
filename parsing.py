@@ -205,8 +205,8 @@ def find_ids(file, entity_name):
 
 def init(filtre=['']):
 
-	str = os.path.dirname(os.path.realpath(src_file_path))
-	dirPath = str+SEP+"GENOME_REPORTS"
+	#str = os.path.dirname(os.path.realpath(src_file_path))
+	dirPath = "GENOME_REPORTS"
 	dirIds = dirPath + SEP + "IDS"
 	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/overview.txt",dirPath)
 	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Archaea.ids",dirIds)
@@ -248,8 +248,6 @@ def init(filtre=['']):
 
 		split_string = line.split("\t")
 		path = dirPath +SEP + 'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]
-		print(path)
-		sys.stdout.flush()
 		if split_string[1] == 'Archaea':
 			entity_id = find_ids(ids_files[0], split_string[0])
 			if not entity_id == None and 'NC' in entity_id:
@@ -313,7 +311,7 @@ def join(coord, sequence, f, file=''):
 ## --------------------------------------------------------------------------- ##
 
 Entrez.email = "thomas18199@hotmail.fr"
-init()
+#init()
 print(SEP)
 
 
