@@ -17,7 +17,7 @@ else: SEP = "/"
 def download_file(url, dir):
 	if not os.path.isdir(dir):
 		os.makedirs(dir)
-	file_name = dir + SEP + url.split('/')[-1]
+	file_name = os.path.join(dir, url.split('/')[-1])
 	u = urllib.request.urlopen(url)
 	f = open(file_name, 'wb')
 	meta = u.info()
@@ -34,21 +34,10 @@ def download_file(url, dir):
 		f.write(buffer)
 		status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
 		status = status + chr(8)*(len(status)+1)
-		sys.stdout.write('%s' % (status))
+		sys.stdout.write('%s\n' % (status))
 		sys.stdout.flush()
 
 	f.close()
-
-def progress(count, total, status=''):
-
-	bar_len = 60
-	filled_len = int(round(bar_len * count / float(total)))
-
-	percents = round(100.0 * count / float(total), 1)
-	bar = '=' * (filled_len) + '>' + '.' * (bar_len - filled_len)
-
-	sys.stdout.write('[%s] %s%s\t|\t%s\r' % (bar, percents, '%', status))
-	sys.stdout.flush()
 
 def parse_location(location):
 	loc = location.replace(":", " ")
@@ -75,11 +64,12 @@ def write_seq(file, gb_record):
 	sys.stdout = new_stdout
 	function_group = []
 	features = gb_record.features
+
 	for f in features:
 		if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
 			loc = str(f.location)
-			loc = loc.split(' ')
 			coord = parse_location(loc)
+			coord = coord.split(' ')
 			int_coord = []
 			for num in coord:
 				int_coord.append(int(num))
@@ -115,134 +105,40 @@ def date_convert(date): #mettre la date dans un format exploitable afin de les c
 	date = date[2] + date[1] + date[0]
 	return date
 
-def update(old_date, new_date): #compare les dates et renvoie un booléen correspondant au devoir de mise à jour
+def date_compare(old_date, new_date): #compare les dates et renvoie un booléen correspondant au devoir de mise à jour
+	if old_date == "":
+		return True
 	olddate = date_convert(old_date)
 	newdate = date_convert(new_date)
 	return olddate < newdate
-
-def create_file(split_string, entity_id, ids, gb_record, path):
-	# Vérifier si le dossier existe ou non : inutile si les lignes sont distinctes
-	function_group = ""
-	new_date = gb_record.annotations.get("date")
-	if not os.path.isdir(path):
-		os.makedirs(path)
-
-	if not os.path.isfile(path + SEP + entity_id + '.txt'):
-		date_file = open(path + SEP + 'date.dat', "a")
-		date_file.write(new_date)
-		date_file.close()
-		file = open(path + SEP + entity_id + '.txt', "a")
-
-		ids = ids + ',' + entity_id
-		write_seq(file, gb_record)
-		file.close()
-
-	date_file = open(path + SEP + 'date.dat', "r")
-	old_date = date_file.readlines()[0]
-	date_file.close()
-
-	if update(old_date, new_date):
-		date_file = open(path + SEP + 'date.dat', "w")
-		date_file.write(new_date)
-		date_file.close()
-		file = open(path + SEP + entity_id + '.txt', "w")
-
-		ids = ids + ',' + entity_id
-		write_seq(file, gb_record)
-		file.close()
 
 def get_record(entity_id):
 	handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=entity_id)
 	record = SeqIO.read(handle, "gb")
 	handle.close()
-	print(record)
+	return record
 
-def associate(ids, path):
-	handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=ids)
-	fgroup = ""
-	for seq_record in SeqIO.parse(handle, "gb"):
-		#print(seq_record.annotations.get("date"))
-		function_group = []
-		functiongroup = ''
-		for f in seq_record.features:
-			if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
-				function_group.append(str(f.type))
-		function_group = list(dict.fromkeys(function_group))
-		for type_ in function_group:
-			functiongroup = functiongroup + "\t" + type_
-		fgroup = fgroup + functiongroup + ","
+def filters(index, filtre, entity_id, path):
 
-	tab_group = fgroup.split(',')
-	tab_path = path.split(',')
-	if os.path.isfile('index.txt'):
-		os.remove('index.txt')
-	index = open('index.txt', "a")
-	for i in range(len(tab_group)-1):
-		print(tab_path[i] + '\t' + tab_group[i], file=index)
-	index.close()
+	path_date      = os.path.join(path, 'date.dat')
+	path_entity_id = os.path.join(path, entity_id + '.txt')
 
-
-
-def create_tree(overview_lines, ids_files, root_dir):
-
-	ids = ""
-	pathes = ""
-
-	nb_lines = len(overview_lines)
-	for num, line in enumerate(overview_lines[1:], 1):
-		progress(num, nb_lines, status='Creating directories')
-
-		split_string = line.split("\t")
-		if root_dir == "GENOME_REPORTS":
-			path = ('Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')
-		else :
-			path = root_dir.replace(SEP+"GENOME_REPORTS",'').replace("GENOME_REPORTS",'')+( SEP+'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')
-		if not os.path.isdir(path):
-			if split_string[1] == 'Archaea':
-				kingdom = 0
-			if split_string[1] == 'Bacteria':
-				kingdom = 1
-			if split_string[1] == 'Eukaryota':
-				kingdom = 2
-			if split_string[1] == 'Viruses':
-				kingdom = 3
-
-			if kingdom == 0 or kingdom == 1 or kingdom == 2 or kingdom == 3:
-				entity_id = str(find_ids(ids_files[kingdom], split_string[0]))
-
-			if not entity_id == None:
-				os.makedirs(path)
-				file = open(path + SEP + entity_id + '.txt', "a")
-				ids = ids + entity_id + ","
-				pathes = pathes + path + ","
-
-				#get_record(entity_id)
-
-				file.close()
-
-	#if not ids == "":
-	#	associate(ids, pathes)
-
-
-
-
-def filter(index, filtre, entity_id, path):
 
 	with Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=entity_id) as handle:
 		gb_record = SeqIO.read(handle, "gb")
 
-	if os.path.isfile(path + SEP + 'date.dat'):
+	if os.path.isfile(path_date):
 		new_date = gb_record.annotations.get("date")
-		date_file = open(path + SEP + 'date.dat', "r")
+		date_file = open(path_date, "r")
 		old_date = date_file.readlines()[0]
 		date_file.close()
 		if not update(old_date, new_date):
 			return (False, gb_record)
 
-	if not os.path.isfile(path + SEP + 'date.dat'):
+	if not os.path.isfile(path_date):
 
 		new_date = gb_record.annotations.get("date")
-		date_file = open(path + SEP + 'date.dat', "a")
+		date_file = open(path_date, "a")
 		date_file.write(new_date)
 		date_file.close()
 		return (False, gb_record)
@@ -257,7 +153,7 @@ def filter(index, filtre, entity_id, path):
 	for type_ in function_group:
 			functiongroup = functiongroup + '\t' + type_
 
-	index.write(path + SEP + entity_id + '.txt' + functiongroup + '\n')
+	index.write(path_entity_id + functiongroup + '\n')
 
 	if filtre[0] == '':
 		return (True, gb_record)
@@ -268,90 +164,12 @@ def filter(index, filtre, entity_id, path):
 			return (False, gb_record)
 	return (True, gb_record)
 
-def find_ids(file, entity_name):
-	# iterate over lines, and print out line numbers which contain
-	# the word of interest.
-	for line in file:
-		split_string = line.split("\t")
-		if entity_name in split_string: # or word in line.split() to search for full words
-			return split_string[1]
-
-def init(filtre=[''],dir=""):
-
-	#base = os.path.dirname(os.path.realpath(src_file_path))
-	if platform.system() == "Windows" and dir!="":
-		#base = os.path.dirname(os.path.realpath(dir))
-		dirPath = dir + SEP + "GENOME_REPORTS"
-		sys.stdout.flush()
-	else :
-		dirPath = "GENOME_REPORTS"
-	print("dir path :",dirPath)
-	dirIds = dirPath + SEP + "IDS"
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/overview.txt",dirPath)
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Archaea.ids",dirIds)
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Bacteria.ids",dirIds)
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Eukaryota.ids",dirIds)
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Viruses.ids",dirIds)
-	print(dirPath)
-	# Ouvrir le fichier en lecture seule
-	overview = open(dirPath+SEP+'overview.txt', "r")
-	archaea_ids = open(dirIds + SEP +'Archaea.ids', "r")
-	bacteria_ids = open(dirIds+SEP+'Bacteria.ids', "r")
-	eukaryota_ids = open(dirIds+ SEP+ 'Eukaryota.ids', "r")
-	viruses_ids = open(dirIds+ SEP+ 'Viruses.ids', "r")
-	# utiliser readlines pour lire toutes les lignes du fichier
-	# La variable "lignes" est une liste contenant toutes les lignes du fichier
-	overview_lines = overview.readlines()
-	archaea_lines = archaea_ids.readlines()
-	bacteria_lines = bacteria_ids.readlines()
-	eukaryota_lines = eukaryota_ids.readlines()
-	viruses_lines = viruses_ids.readlines()
-	ids_files = [archaea_lines, bacteria_lines, eukaryota_lines, viruses_lines]
-	# fermez le fichier après avoir lu les lignes
-	overview.close()
-	archaea_ids.close()
-	bacteria_ids.close()
-	eukaryota_ids.close()
-	viruses_ids.close()
-
-	nb_lines = len(overview_lines)
-	ids = ''
-	count=0
-	kingdom = -1
-
-	create_tree(overview_lines, ids_files, dirPath)
-	# Itérer sur les lignes sauf la première
-
-	#for num, line in enumerate(overview_lines[1:], 1):
-
-	#	split_string = line.split("\t")
-	#	path = 'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]
-
-
-		#if split_string[1] == 'Archaea':
-		#	kingdom = 0
-		#if split_string[1] == 'Bacteria':
-		#	kingdom = 1
-		#if split_string[1] == 'Eukaryota':
-		#	kingdom = 2
-		#if split_string[1] == 'Viruses':
-		#	kingdom = 3
-
-		#if kingdom == 0 or kingdom == 1 or kingdom == 2 or kingdom == 3:
-		#	entity_id = find_ids(ids_files[kingdom], split_string[0])
-		#	if not entity_id == None and 'NC' in entity_id:
-		#		(state, gb_record) = filter(index, filtre, entity_id, path)
-		#		if state:
-		#			create_file(split_string, entity_id, ids, gb_record, path)
-		#			count=count+1
-
-
 def join(coord, sequence, f, file=''):
 	old_stdout = sys.stdout
 	new_stdout = io.StringIO()
 	sys.stdout = new_stdout
 	l = len(coord)
-	loc = parse_location(str(f.location))
+	loc = "(" + parse_location(str(f.location)).replace(" ", ",") + ")"
 	string = ""
 	for i in range(round(l/2)):
 		inf = coord[2*i]
@@ -362,8 +180,276 @@ def join(coord, sequence, f, file=''):
 	print(output, file=file)
 	sys.stdout = old_stdout
 
+def update(path):
+	path           = path.replace(':','_').replace(' ','_')
+
+	if not os.path.isdir(path): # Je crois qu'on est jamais dans ce cas là
+		os.makedirs(path)
+
+	# Vérifier si le dossier existe ou non : inutile si les lignes sont distinctes
+	for files in os.listdir(path):
+		if not files == 'date.dat':
+			entity_id = files.replace(".txt", "")
+
+	path_date      = os.path.join(path, 'date.dat')
+	path_entity_id = os.path.join(path, entity_id + '.txt')
+
+	record = get_record(entity_id)
+	print(path_entity_id)
+
+	new_date = record.annotations.get("date")
+
+	if not os.path.isfile(path_entity_id):
+		date_file = open(path_date, "a")
+		date_file.write(new_date)
+		date_file.close()
+		file = open(path_entity_id, "a")
+
+		ids = ids + ',' + entity_id
+		write_seq(file, record)
+		file.close()
+
+	if not os.path.isfile(path_date):
+		date_file = open(path_date, "a")
+		date_file.write(new_date)
+		date_file.close()
+		file = open(path_entity_id, "w")
+		write_seq(file, record)
+		file.close()
+
+	date_file = open(path_date, "r")
+	old_date = date_file.readlines()[0]
+	date_file.close()
+
+	if date_compare(old_date, new_date):
+		date_file = open(path_date, "w")
+		date_file.write(new_date)
+		date_file.close()
+		file = open(path_entity_id, "w")
+											# Comprend pas là
+		ids = ids + ',' + entity_id
+		write_seq(file, record)
+		file.close()
+
+def parse(filtre):
+	if platform.system() == "Windows": index = open('index_windows.txt', "r")
+	else: index = open('index.txt', "r")
+	index_lines = index.readlines()
+	index.close()
+
+	print(index_lines)
+	for line in index_lines:
+		BOOL = 1
+		for group in filtre:
+			if not group in line:
+				BOOL = 0
+		if BOOL == 1:
+			print(line.split("\t")[0])
+			update(line.split("\t")[0])
+
+
+
+
+
+
+
+
+
+
+
+
+def progress(count, total, status=''):
+
+	bar_len = 45
+	filled_len = int(round(bar_len * count / float(total)))
+
+	percents = round(100.0 * count / float(total), 1)
+	bar = '=' * (filled_len) + '>' + '.' * (bar_len - filled_len)
+
+	sys.stdout.write('[%s] %s%s | %s\r' % (bar, percents, '%', status))
+	sys.stdout.flush()
+
+def associate(ids, paths, dates):
+	ids    = ids.split(',')
+	paths  = paths.split(',')
+	dates  = dates.split(',')
+	lenght = len(ids)
+
+	i = 0
+	#handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=ids)
+	fgroup = ""
+	for entity_id, path, date in zip(ids, paths, dates):
+
+		seq_record = get_record(entity_id)
+
+		if not date_compare(date, seq_record.annotations.get("date")): #Normalement c'est bien le cas dans lequel
+			continue
+
+		date_file = open(os.path.join(path, "date.dat"), "w") # mettre à jour le date.dat
+		date_file.write(seq_record.annotations.get("date"))
+		date_file.close()
+
+
+		function_group = []
+		functiongroup = ''
+		for f in seq_record.features:
+			if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
+				function_group.append(str(f.type))
+		function_group = list(dict.fromkeys(function_group))
+		for type_ in function_group:
+			functiongroup = functiongroup + "\t" + type_
+		#fgroup = fgroup + functiongroup + ","
+
+		#print(paths[i] + '\t' +entity_id + functiongroup, file=index)
+		i = i + 1
+		print(f'{i}/{lenght}')
+
+	#tab_group = fgroup.split(',')
+	#paths = path.split(',')
+
+	#for i in range(len(tab_group)-1):
+		#print(paths[i] + '\t' + tab_group[i], file=index)
+	index.close()
+
+def find_ids(file, entity_name):
+	# iterate over lines, and print out line numbers which contain
+	# the word of interest.
+	for line in file:
+		split_string = line.split("\t")
+		if entity_name in split_string: # or word in line.split() to search for full words
+			return split_string[1]
+
+def create_tree(overview_lines, ids_files):
+
+	ids   = ""
+	paths = ""
+	dates = ""
+
+	all_entity_id = []
+	r = re.compile(".*txt")
+	if os.path.isfile('index.txt'):
+		index = open('index.txt', 'r')
+		for line in index.readlines():
+			#append le NC dans all_entity_id
+			entity_id = line.split('\t')[1].split('\n')[0]
+			#print(os.listdir(path))
+			all_entity_id.append(entity_id)
+		index.close()
+
+	nb_lines = len(overview_lines)
+	for num, line in enumerate(overview_lines[1:], 1):
+		progress(num, nb_lines, status='Creating directories')
+		entity_id = "None" # init à chaque boucle
+
+		split_string = line.split("\t")
+		new_name = split_string[0].replace("[", "")
+		new_name = new_name.replace("]", "")
+		new_name = new_name.replace(":", "_")
+		new_name = new_name.replace("'", "")
+		new_name = new_name.replace("(", "")
+		new_name = new_name.replace(")", "")
+		new_name = new_name.replace(".", "")
+
+		"""if root_dir == "GENOME_REPORTS":
+			path = ('Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')
+		else :
+			path = root_dir.replace(SEP+"GENOME_REPORTS",'').replace("GENOME_REPORTS",'')+( SEP+'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')"""
+
+		# Si la ligne n'est pas conforme on ne la traite pas
+		if len(split_string) < 4:
+			continue
+
+		path = (os.path.join('Results', split_string[1], split_string[2], split_string[3], new_name)).replace(':','_').replace(' ','_')
+
+		if split_string[1] == 'Archaea':
+			kingdom = 0
+		if split_string[1] == 'Bacteria':
+			kingdom = 1
+		if split_string[1] == 'Eukaryota':
+			kingdom = 2
+		if split_string[1] == 'Viruses':
+			kingdom = 3
+
+		if kingdom == 0 or kingdom == 1 or kingdom == 2 or kingdom == 3:
+			entity_id = str(find_ids(ids_files[kingdom], split_string[0]))
+
+		if not entity_id == "None":
+			if not os.path.isdir(path):
+				os.makedirs(path)
+
+			path_date      = os.path.join(path, 'date.dat')
+			path_entity_id = os.path.join(path, entity_id + '.txt')
+
+			if os.path.isfile(path_date):
+				date_file = open(path_date, 'r')
+				date      = date_file.readline()
+				date_file.close()
+			else:
+				date = ""
+
+			file  = open(path_entity_id, "a") #juste créer le fichier NC # Je sais pas si il faudrait pas faire ca plus tard dans l'algo (je pense que si)
+			file.close()
+
+			ids   = ids   + entity_id + ","
+			paths = paths + path      + ","
+			dates = dates + date      + ","
+
+
+	return (ids[:-1], paths[:-1], dates[:-1])
+
+def download():
+	dirPath = "GENOME_REPORTS"
+	dirIds  = os.path.join(dirPath, "IDS")
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/overview.txt"     ,dirPath)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Archaea.ids"  , dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Bacteria.ids" , dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Eukaryota.ids", dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Viruses.ids"  , dirIds)
+
+
+def init(filtre=['']):
+
+	download()
+	# Ouvrir le fichier en lecture seule
+	overview        = open('GENOME_REPORTS/overview.txt'     , "r")
+	archaea_ids     = open('GENOME_REPORTS/IDS/Archaea.ids'  , "r")
+	bacteria_ids    = open('GENOME_REPORTS/IDS/Bacteria.ids' , "r")
+	eukaryota_ids   = open('GENOME_REPORTS/IDS/Eukaryota.ids', "r")
+	viruses_ids     = open('GENOME_REPORTS/IDS/Viruses.ids'  , "r")
+
+	# utiliser readlines pour lire toutes les lignes du fichier
+	# La variable "lignes" est une liste contenant toutes les lignes du fichier
+	overview_lines  = overview.readlines()
+	archaea_lines   = archaea_ids.readlines()
+	bacteria_lines  = bacteria_ids.readlines()
+	eukaryota_lines = eukaryota_ids.readlines()
+	viruses_lines   = viruses_ids.readlines()
+	ids_files       = [archaea_lines, bacteria_lines, eukaryota_lines, viruses_lines]
+
+	# fermez le fichier après avoir lu les lignes
+	overview.close()
+	archaea_ids.close()
+	bacteria_ids.close()
+	eukaryota_ids.close()
+	viruses_ids.close()
+
+	nb_lines = len(overview_lines)
+	ids      = ''
+	count    = 0
+	kingdom  = -1
+
+	(ids, paths, dates) = create_tree(overview_lines, ids_files)
+	# Itérer sur les lignes sauf la première
+
+	if not ids == "":
+		print("ok")
+		associate(ids, paths, dates)
+
 
 ## --------------------------------------------------------------------------- ##
 
 Entrez.email = "thmslpn@gmail.com"
+mail = ['test@gmail.com','test1@gmail.com','test2@gmail.com','test3@gmail.com','test4@gmail.com','test5@gmail.com','test6@gmail.com','test7@gmail.com','test8@gmail.com','test9@gmail.com',]
 #init()
+init()
+#parse(['tRNA'])
