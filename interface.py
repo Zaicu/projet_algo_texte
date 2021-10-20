@@ -3,7 +3,6 @@ import os
 import time
 import platform
 import inspect
-import threading
 from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel
 from PyQt5.QtCore import QModelIndex
 src_file_path = inspect.getfile(lambda: None)
@@ -92,19 +91,20 @@ class Button(QWidget):
         self.setLayout(layout)
     def parse(self) :
         if(tree.path != "blank"):
-            logs.write(tree.path+ " - ",menu_regions.content)
+            logs.write_parse(tree.path+ " - ",menu_regions.content)
+            parse([menu_regions.content,tree.content])
+            logs.write("Parsing terminé")
+
         #th = threading.Thread(target=init,args=([menu_regions.content],root_dir))
         #th.start()
         #th.join()
-        init(menu_regions.content)
-
 
 class Button_init(QWidget):
     def __init__(self,menu1,menu2):
         super().__init__()
 
 
-        self.entree = QPushButton('Init', self)
+        self.entree = QPushButton('Init directories', self)
         self.entree.setCheckable(True)
 
         self.entree.clicked.connect(self.initialisation)
@@ -117,12 +117,12 @@ class Button_init(QWidget):
         layout.addWidget(self.entree)
         self.setLayout(layout)
     def initialisation(self) :
-        logs.write('',"Initialisation")
+        logs.write_parse('',"Initialisation")
         #th_init = threading.Thread(target=init,args=([],root_dir))
         #th_init.start()
         #th_init.join()
 
-        init()
+        init(logs)
 
 
 class Logs(QWidget):
@@ -137,11 +137,16 @@ class Logs(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.text)
         self.setLayout(layout)
-    def write(self, kingdom, region):
+    def write_parse(self, kingdom, region):
         if len(self.text.list) > 10 :
             del(self.text.list[1])
         add = "Parsing en cours : "+ kingdom + region
         self.text.list.append("\n" + add)
+        self.text.setText(" ".join(self.text.list))
+    def write(self, text):
+        if len(self.text.list) > 10 :
+            del(self.text.list[1])
+        self.text.list.append("\n" + text)
         self.text.setText(" ".join(self.text.list))
 
 
