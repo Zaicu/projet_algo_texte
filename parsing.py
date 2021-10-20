@@ -279,15 +279,17 @@ def associate(ids, paths, dates):
 	dates  = dates.split(',')
 	lenght = len(ids)
 
-	today      = open("today", "r")
-	date_ids   = today.readline().rstrip('\n')
-	today.close()
 	today_date = datetime.date.today().strftime("%d-%b-%Y").upper()
+
+	if os.path.isfile('today'):
+		today      = open("today", "r")
+		date_ids   = today.readline().rstrip('\n')
+		today.close()
+	else:
+		date_ids = ""	# Si today n'est pas créer, on le crée dans le prochain else
 
 	today_ids = []
 
-	print(date_ids)
-	print(today_date)
 	if date_ids == today_date:
 		print('a')
 		today = open("today", "r")
@@ -484,6 +486,8 @@ def init(logs, filtre=['']):
 
 Entrez.email = "thmslpn@gmail.com"
 mail = ['test@gmail.com','test1@gmail.com','test2@gmail.com','test3@gmail.com','test4@gmail.com','test5@gmail.com','test6@gmail.com','test7@gmail.com','test8@gmail.com','test9@gmail.com',]
-#init()
-#init()
-#parse(['tRNA'])
+
+if __name__ == "__main__":
+	#init()
+	init(sys.stdout)
+	#parse(['tRNA'])
