@@ -475,11 +475,7 @@ def init(logs, filtre=['']):
 	kingdom  = -1
 
 	(ids, paths, dates) = create_tree(overview_lines, ids_files)
-	# Itérer sur les lignes sauf la première
-
-	if not ids == "":
-		print("ok")
-		associate(ids, paths, dates)
+	return (ids, paths, dates)
 
 
 ## --------------------------------------------------------------------------- ##
@@ -489,5 +485,8 @@ mail = ['test@gmail.com','test1@gmail.com','test2@gmail.com','test3@gmail.com','
 
 if __name__ == "__main__":
 	#init()
-	init(sys.stdout)
+	(ids, paths, dates) = init(sys.stdout)
+	if not ids == "":
+		print("ok")
+		associate(ids, paths, dates)
 	#parse(['tRNA'])
