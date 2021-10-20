@@ -4,7 +4,7 @@ import time
 import platform
 import inspect
 from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel
-from PyQt5.QtCore import QModelIndex
+from PyQt5.QtCore import QModelIndex, QRunnable, QThreadPool
 src_file_path = inspect.getfile(lambda: None)
 root_dir = os.path.dirname(os.path.realpath(src_file_path))
 dir = root_dir+r'\Test'
@@ -48,7 +48,6 @@ class FileSystemView(QWidget):
             self.path = path2.replace("/","\\")
         else :
             self.path = path2
-
 
 class Menu(QWidget):
     def __init__(self,list):
@@ -100,6 +99,7 @@ class Button(QWidget):
         #th.join()
 
 class Button_init(QWidget):
+
     def __init__(self,menu1,menu2):
         super().__init__()
 
@@ -121,9 +121,15 @@ class Button_init(QWidget):
         #th_init = threading.Thread(target=init,args=([],root_dir))
         #th_init.start()
         #th_init.join()
+        self.threadpool = QThreadPool()
+        worker = Worker()
+        self.threadpool.start(worker)
 
+
+class Worker(QRunnable):
+    def run(self):
         init(logs)
-
+        time.sleep(5)
 
 class Logs(QWidget):
     def __init__(self):
@@ -180,4 +186,5 @@ if __name__ == '__main__':
     win.setLayout(grid)
     win.setWindowTitle("Logiciel Bioinformatique")
     win.show()
+
     sys.exit(app.exec_())
