@@ -10,6 +10,7 @@ import io
 import os.path
 import sys
 import platform
+import datetime # C'est à enlever des qu'on a résolu le problème de date
 
 if platform.system() == "Windows": SEP = "\\"
 else: SEP = "/"
@@ -58,10 +59,11 @@ def parse_location(location):
 	return loc
 
 
-def write_seq(file, gb_record):
-	old_stdout = sys.stdout
-	new_stdout = io.StringIO()
-	sys.stdout = new_stdout
+def write_seq(file_path, gb_record):
+	#old_stdout = sys.stdout
+	#new_stdout = io.StringIO()
+	#sys.stdout = new_stdout
+	file = open(file_path, "w")
 	function_group = []
 	features = gb_record.features
 
@@ -75,17 +77,18 @@ def write_seq(file, gb_record):
 				int_coord.append(int(num))
 			if not "join" in loc and not "complement" in loc:
 				inf, sup = min(int_coord), max(int_coord)
-				print("%s\t%d..%d" % (f.type, inf, sup))
-				print(gb_record.seq[inf:sup] + '\n')
+				file.write("%s\t%d..%d\n" % (f.type, inf, sup))
+				file.write(str(gb_record.seq[inf:sup]) + '\n\n')
 			if "complement" in loc and not "join" in loc:
 				inf, sup = min(int_coord), max(int_coord)
-				print("%s\tcomplement(%d..%d)" % (f.type, inf, sup))
-				print(gb_record.seq[inf:sup] + '\n')
+				file.write("%s\tcomplement(%d..%d)\n" % (f.type, inf, sup))
+				file.write(str(gb_record.seq[inf:sup]) + '\n\n')
 			if "join" in loc:
 				join(int_coord, gb_record.seq, f, file)
-	output = new_stdout.getvalue()
-	print(output, file=file)
-	sys.stdout = old_stdout
+	#output = new_stdout.getvalue()
+	#print(output)
+	#sys.stdout = old_stdout
+	file.close()
 
 def date_convert(date): #mettre la date dans un format exploitable afin de les comparer numériquement
 	date = date.replace("JAN", "01")
@@ -165,20 +168,20 @@ def filters(index, filtre, entity_id, path):
 	return (True, gb_record)
 
 def join(coord, sequence, f, file=''):
-	old_stdout = sys.stdout
-	new_stdout = io.StringIO()
-	sys.stdout = new_stdout
+	#old_stdout = sys.stdout
+	#new_stdout = io.StringIO()
+	#sys.stdout = new_stdout
 	l = len(coord)
 	loc = "(" + parse_location(str(f.location)).replace(" ", ",") + ")"
 	string = ""
 	for i in range(round(l/2)):
 		inf = coord[2*i]
 		sup = coord[2*i+1]
-		print("%s\t%s\t%d..%d" % (f.type, loc, inf, sup))
-		print(sequence[inf:sup] + '\n')
-	output = new_stdout.getvalue()
-	print(output, file=file)
-	sys.stdout = old_stdout
+		file.write("%s\t%s\t%d..%d\n" % (f.type, loc, inf, sup))
+		file.write(str(sequence[inf:sup]) + '\n\n')
+	#output = new_stdout.getvalue()
+	#print(output)
+	#sys.stdout = old_stdout
 
 def update(path):
 	path           = path.replace(':','_').replace(' ','_')
@@ -275,14 +278,43 @@ def associate(ids, paths, dates):
 	dates  = dates.split(',')
 	lenght = len(ids)
 
+	today      = open("today", "r")
+	date_ids   = today.readline().rstrip('\n')
+	today.close()
+	today_date = datetime.date.today().strftime("%d-%b-%Y").upper()
+
+	today_ids = []
+
+	print(date_ids)
+	print(today_date)
+	if date_ids == today_date:
+		print('a')
+		today = open("today", "r")
+		today_ids = [line.rstrip('\n') for line in today.readlines()[1:]]
+		today.close()
+	else:
+		print('b')
+		today = open("today", "w")
+		today.write(today_date + '\n')
+		today.close()
+
+	today = open("today", "a")
+
 	i = 0
 	#handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=ids)
 	fgroup = ""
 	for entity_id, path, date in zip(ids, paths, dates):
 
+		i = i + 1
+		print(f'{i}/{lenght}')
+
+		if entity_id in today_ids:
+			continue
+
 		seq_record = get_record(entity_id)
 
-		if not date_compare(date, seq_record.annotations.get("date")): #Normalement c'est bien le cas dans lequel
+		if not date_compare(date, seq_record.annotations.get("date")): #Normalement c'est bien le cas dans lequel y a pas besoin de mettre à jour
+			today.write(entity_id + '\n')
 			continue
 
 		date_file = open(os.path.join(path, "date.dat"), "w") # mettre à jour le date.dat
@@ -291,25 +323,26 @@ def associate(ids, paths, dates):
 
 
 		function_group = []
-		functiongroup = ''
 		for f in seq_record.features:
 			if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
 				function_group.append(str(f.type))
-		function_group = list(dict.fromkeys(function_group))
-		for type_ in function_group:
-			functiongroup = functiongroup + "\t" + type_
+		function_group = list(dict.fromkeys(function_group)) # retire les doublons dans la liste function_group
+		print(function_group)
+
+		print(os.path.join(path, entity_id))
+		write_seq(os.path.join(path, entity_id), seq_record)
+		today.write(entity_id + '\n')
+
 		#fgroup = fgroup + functiongroup + ","
 
 		#print(paths[i] + '\t' +entity_id + functiongroup, file=index)
-		i = i + 1
-		print(f'{i}/{lenght}')
 
+	today.close()
 	#tab_group = fgroup.split(',')
 	#paths = path.split(',')
 
 	#for i in range(len(tab_group)-1):
 		#print(paths[i] + '\t' + tab_group[i], file=index)
-	index.close()
 
 def find_ids(file, entity_name):
 	# iterate over lines, and print out line numbers which contain
@@ -387,7 +420,7 @@ def create_tree(overview_lines, ids_files):
 			else:
 				date = ""
 
-			file  = open(path_entity_id, "a") #juste créer le fichier NC # Je sais pas si il faudrait pas faire ca plus tard dans l'algo (je pense que si)
+			file  = open(path_entity_id, "a") #crée le fichier NC # Je sais pas si il faudrait pas faire ca plus tard dans l'algo (je pense que si)
 			file.close()
 
 			ids   = ids   + entity_id + ","
