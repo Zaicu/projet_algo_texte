@@ -15,7 +15,7 @@ import datetime # C'est à enlever des qu'on a résolu le problème de date
 if platform.system() == "Windows": SEP = "\\"
 else: SEP = "/"
 
-def download_file(url, dir):
+def download_file(url, dir, logs):
 	if not os.path.isdir(dir):
 		os.makedirs(dir)
 	file_name = os.path.join(dir, url.split('/')[-1])
@@ -430,19 +430,19 @@ def create_tree(overview_lines, ids_files):
 
 	return (ids[:-1], paths[:-1], dates[:-1])
 
-def download():
+def download(logs):
 	dirPath = "GENOME_REPORTS"
 	dirIds  = os.path.join(dirPath, "IDS")
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/overview.txt"     ,dirPath)
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Archaea.ids"  , dirIds)
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Bacteria.ids" , dirIds)
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Eukaryota.ids", dirIds)
-	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Viruses.ids"  , dirIds)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/overview.txt"     ,dirPath, logs)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Archaea.ids"  , dirIds, logs)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Bacteria.ids" , dirIds, logs)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Eukaryota.ids", dirIds, logs)
+	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Viruses.ids"  , dirIds, logs)
 
 
-def init(filtre=['']):
+def init(logs, filtre=['']):
 
-	download()
+	download(logs)
 	# Ouvrir le fichier en lecture seule
 	overview        = open('GENOME_REPORTS/overview.txt'     , "r")
 	archaea_ids     = open('GENOME_REPORTS/IDS/Archaea.ids'  , "r")
@@ -484,5 +484,5 @@ def init(filtre=['']):
 Entrez.email = "thmslpn@gmail.com"
 mail = ['test@gmail.com','test1@gmail.com','test2@gmail.com','test3@gmail.com','test4@gmail.com','test5@gmail.com','test6@gmail.com','test7@gmail.com','test8@gmail.com','test9@gmail.com',]
 #init()
-init()
+#init()
 #parse(['tRNA'])
