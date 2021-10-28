@@ -273,11 +273,26 @@ def progress(count, total, status=''):
 	sys.stdout.write('[%s] %s%s | %s\r' % (bar, percents, '%', status))
 	sys.stdout.flush()
 
-def associate(ids, paths, dates):
+#def separate(ids, paths, dates):
+#	return
+
+
+def associate(ids, paths, dates, directory_parsing):
 	ids    = ids.split(',')
 	paths  = paths.split(',')
 	dates  = dates.split(',')
-	lenght = len(ids)
+
+	reduced_ids   = []
+	reduced_paths = []
+	reduced_dates = []
+
+	for id, path, date in zip(ids, paths, dates):
+		if directory_parsing in path:
+			reduced_ids.append(id)
+			reduced_paths.append(path)
+			reduced_dates.append(date)
+
+	lenght = len(reduced_ids)
 
 	today_date = datetime.date.today().strftime("%d-%b-%Y").upper()
 
@@ -303,10 +318,14 @@ def associate(ids, paths, dates):
 
 	today = open("today", "a")
 
+	#((reduced_ids_1, reduced_paths_1, reduced_dates_1),
+	# (reduced_ids_2, reduced_paths_2, reduced_dates_2),
+	# (reduced_ids_3, reduced_paths_3, reduced_dates_3)) = separate(reduced_ids, reduced_paths, reduced_dates)
+
 	i = 0
 	#handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=ids)
 	fgroup = ""
-	for entity_id, path, date in zip(ids, paths, dates):
+	for entity_id, path, date in zip(reduced_ids, reduced_paths, reduced_dates):
 
 		i = i + 1
 		print(f'{i}/{lenght}')
@@ -316,7 +335,7 @@ def associate(ids, paths, dates):
 
 		seq_record = get_record(entity_id)
 
-		if not date_compare(date, seq_record.annotations.get("date")): #Normalement c'est bien le cas dans lequel y a pas besoin de mettre à jour
+		if not date_compare(date, seq_record.annotations.get("date")):
 			today.write(entity_id + '\n')
 			continue
 
@@ -414,7 +433,7 @@ def create_tree(overview_lines, ids_files):
 				os.makedirs(path)
 
 			path_date      = os.path.join(path, 'date.dat')
-			path_entity_id = os.path.join(path, entity_id + '.txt')
+			path_entity_id = os.path.join(path, entity_id)
 
 			if os.path.isfile(path_date):
 				date_file = open(path_date, 'r')
@@ -481,12 +500,13 @@ def init(logs, filtre=['']):
 ## --------------------------------------------------------------------------- ##
 
 Entrez.email = "thmslpn@gmail.com"
-mail = ['test@gmail.com','test1@gmail.com','test2@gmail.com','test3@gmail.com','test4@gmail.com','test5@gmail.com','test6@gmail.com','test7@gmail.com','test8@gmail.com','test9@gmail.com',]
 
 if __name__ == "__main__":
 	#init()
+	directory_parsing = "Results/Viruses/Other"
 	(ids, paths, dates) = init(sys.stdout)
+	#path => reduire mes listes en fonction de ce qui est selectionné
 	if not ids == "":
 		print("ok")
-		associate(ids, paths, dates)
+		associate(ids, paths, dates, directory_parsing)
 	#parse(['tRNA'])
