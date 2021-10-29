@@ -374,7 +374,7 @@ def find_ids(file, entity_name):
 		if entity_name in split_string: # or word in line.split() to search for full words
 			return split_string[1]
 
-def create_tree(overview_lines, ids_files):
+def create_tree(overview_lines, ids_files, logs, prgss):
 
 	ids   = ""
 	paths = ""
@@ -392,7 +392,11 @@ def create_tree(overview_lines, ids_files):
 		index.close()
 
 	nb_lines = len(overview_lines)
+	prgss.setVisible(True)
+
 	for num, line in enumerate(overview_lines[1:], 1):
+		prgss.signal_update.emit(100*num/nb_lines)
+		#prgss.setValue(100*num/nb_lines)
 		progress(num, nb_lines, status='Creating directories')
 		entity_id = "None" # init à chaque boucle
 
@@ -462,7 +466,7 @@ def download(logs):
 	download_file("ftp://ftp.ncbi.nlm.nih.gov/genomes/GENOME_REPORTS/IDS/Viruses.ids"  , dirIds, logs)
 
 
-def init(logs, filtre=['']):
+def init(logs, prgss, filtre=['']):
 
 	download(logs)
 	# Ouvrir le fichier en lecture seule
@@ -493,7 +497,8 @@ def init(logs, filtre=['']):
 	count    = 0
 	kingdom  = -1
 
-	(ids, paths, dates) = create_tree(overview_lines, ids_files)
+	(ids, paths, dates) = create_tree(overview_lines, ids_files, logs, prgss)
+	logs.write("Tree done")
 	return (ids, paths, dates)
 
 
