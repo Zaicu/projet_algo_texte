@@ -3,8 +3,8 @@ import os
 import time
 import platform
 import inspect
-from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel
-from PyQt5.QtCore import QModelIndex, QRunnable, QThreadPool
+from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel, QDialog, QProgressBar
+from PyQt5.QtCore import QModelIndex, QRunnable, QThreadPool, QThread, pyqtSignal
 src_file_path = inspect.getfile(lambda: None)
 root_dir = os.path.dirname(os.path.realpath(src_file_path))
 dir = root_dir+r'\Test'
@@ -94,9 +94,6 @@ class Button(QWidget):
             parse([menu_regions.content,tree.content])
             logs.write("Parsing terminé")
 
-        #th = threading.Thread(target=init,args=([menu_regions.content],root_dir))
-        #th.start()
-        #th.join()
 
 class Button_init(QWidget):
 
@@ -104,10 +101,10 @@ class Button_init(QWidget):
         super().__init__()
 
 
-        self.entree = QPushButton('Init directories', self)
+        self.entree = QPushButton('Parse', self)
         self.entree.setCheckable(True)
 
-        self.entree.clicked.connect(self.initialisation)
+        self.entree.clicked.connect(self.parse)
         self.entree.setStyleSheet("margin: 1px; padding: 10px; \
                            background-color: lightgray; \
                            border-style: solid; \
@@ -116,14 +113,34 @@ class Button_init(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.entree)
         self.setLayout(layout)
-    def initialisation(self) :
-        logs.write_parse('',"Initialisation")
+
+    def initialisation(self):
+        logs.write("Please wait during the download")
+        self.threadpool = QThreadPool()
+        worker = Worker()
+        self.threadpool.start(worker)
+
+    def parse(self) :
+        logs.write("Please wait during the download")
         #th_init = threading.Thread(target=init,args=([],root_dir))
         #th_init.start()
         #th_init.join()
         self.threadpool = QThreadPool()
         worker = Worker()
         self.threadpool.start(worker)
+
+class External(QThread):
+    """
+    Runs a counter thread.
+    """
+    countChanged = pyqtSignal(int)
+
+    def run(self):
+        count = 0
+        while count < TIME_LIMIT:
+            count +=1
+            time.sleep(1)
+            self.countChanged.emit(count)
 
 
 class Worker(QRunnable):
@@ -172,19 +189,21 @@ if __name__ == '__main__':
     #menu_kingdom = Menu(["Eucaryota", "Bacteria", "Archaea","Virus","Plasmides", "Organelle"])
     menu_regions = Menu(["5'UTR","3'UTR","tRNA","telomere","rRNA","ncRNA","mobile_element","intron","centromere","CDS"])
     logs = Logs()
-    button = Button(tree, menu_regions)
+    #button = Button(tree, menu_regions)
     button_init = Button_init(tree, menu_regions)
+
 
     grid.addWidget(tree,1,1,5,1)
     grid.addWidget(logs,3,2,2,2)
     #grid.addWidget(menu_kingdom,1,2)
     grid.addWidget(menu_regions,1,3)
     grid.addWidget(button_init,2,2)
-    grid.addWidget(button,2,3)
+    #grid.addWidget(button,2,3)
 
 
     win.setLayout(grid)
     win.setWindowTitle("Logiciel Bioinformatique")
     win.show()
+    button_init.initialisation()
 
     sys.exit(app.exec_())
