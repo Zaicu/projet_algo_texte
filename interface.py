@@ -3,8 +3,9 @@ import os
 import time
 import platform
 import inspect
-from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel, QDialog, QProgressBar
-from PyQt5.QtCore import QModelIndex, QRunnable, QThreadPool, QThread, pyqtSignal
+from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel, QDialog, QProgressDialog
+from PyQt5.QtCore import QModelIndex, QRunnable, QThreadPool, QThread, pyqtSignal, Qt, QThread
+
 src_file_path = inspect.getfile(lambda: None)
 root_dir = os.path.dirname(os.path.realpath(src_file_path))
 dir = root_dir+r'\Test'
@@ -121,7 +122,7 @@ class Button_init(QWidget):
         self.threadpool.start(worker)
 
     def parse(self) :
-        logs.write("Please wait during the download")
+        logs.write("Please wait during the parsing")
         #th_init = threading.Thread(target=init,args=([],root_dir))
         #th_init.start()
         #th_init.join()
@@ -129,23 +130,11 @@ class Button_init(QWidget):
         worker = Worker()
         self.threadpool.start(worker)
 
-class External(QThread):
-    """
-    Runs a counter thread.
-    """
-    countChanged = pyqtSignal(int)
-
-    def run(self):
-        count = 0
-        while count < TIME_LIMIT:
-            count +=1
-            time.sleep(1)
-            self.countChanged.emit(count)
 
 
 class Worker(QRunnable):
     def run(self):
-        init(logs)
+        init(logs, prgss)
         time.sleep(5)
 
 class Logs(QWidget):
@@ -171,7 +160,60 @@ class Logs(QWidget):
             del(self.text.list[1])
         self.text.list.append("\n" + text)
         self.text.setText(" ".join(self.text.list))
+    def prg(self,total):
+        print("creation ",total)
+        #prgss.create(total)
+        #self.prgss=ProgressBar(total)
+        #print("created")
+    def update(self, value,total):
+        prgss.signal_update.emit(int(value/total)*100)
+        if(value==total):
+            prgss.close()
 
+
+class ProgressBar(QProgressDialog):
+    signal_update=pyqtSignal(int)
+
+    def __init__(self, max):
+        print("init")
+        super().__init__()
+        self.setMinimumDuration(0) # Sets how long the loop should last before progress bar is shown (in miliseconds)
+        self.setWindowTitle("Creating directories")
+        self.setModal(True)
+
+        self.setValue(0)
+        self.setMinimum(0)
+        self.setMaximum(max)
+        self.signal_update.connect(self.update)
+        self.show()
+
+    def update(self, value):
+        self.setValue(value)
+        self.show()
+
+    def close(self):
+        self.close()
+
+'''class ProgressBar():
+    def __init__(self):
+        super().__init__()
+
+    def create(self,total):
+        self.dialog = QProgressDialog("Creating directories...", "Abort tree creation", 0, total)
+        self.signal_update=pyqtSignal()
+        self.signal_update.connect(self.update)
+        self.dialog.show()
+
+    def update(self, value):
+        self.dialog.setValue(value)
+        QApplication.processEvents()
+
+    def setWindowModality(self,text):
+        self.dialog.setWindowModality(text)
+
+    def close(self):
+        if self.dialog:
+            self.dialog.close()'''
 
 if __name__ == '__main__':
     if not os.path.isdir(root_dir + SEP+ "GENOME_REPORTS"):
@@ -189,19 +231,20 @@ if __name__ == '__main__':
     #menu_kingdom = Menu(["Eucaryota", "Bacteria", "Archaea","Virus","Plasmides", "Organelle"])
     menu_regions = Menu(["5'UTR","3'UTR","tRNA","telomere","rRNA","ncRNA","mobile_element","intron","centromere","CDS"])
     logs = Logs()
+    prgss = ProgressBar(100)
+    prgss.setVisible(False)
     #button = Button(tree, menu_regions)
     button_init = Button_init(tree, menu_regions)
 
-
     grid.addWidget(tree,1,1,5,1)
-    grid.addWidget(logs,3,2,2,2)
+    grid.addWidget(logs,3,2,2,1)
     #grid.addWidget(menu_kingdom,1,2)
-    grid.addWidget(menu_regions,1,3)
+    grid.addWidget(menu_regions,1,2)
     grid.addWidget(button_init,2,2)
     #grid.addWidget(button,2,3)
 
-
     win.setLayout(grid)
+    win.setGeometry(100,100,200,100)
     win.setWindowTitle("Logiciel Bioinformatique")
     win.show()
     button_init.initialisation()
