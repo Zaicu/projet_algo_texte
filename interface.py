@@ -114,27 +114,31 @@ class Button_init(QWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.entree)
         self.setLayout(layout)
+        self.threadpool = QThreadPool()
 
     def initialisation(self):
         logs.write("Please wait during the download")
-        self.threadpool = QThreadPool()
         worker = Worker()
         self.threadpool.start(worker)
 
     def parse(self) :
-        logs.write("Please wait during the parsing")
+        if(tree.path != "blank"):
+            logs.write_parse(tree.path+ " - ",menu_regions.content)
+            parse([menu_regions.content,tree.content])
+            logs.write("Parsing terminé")
+        '''logs.write("Please wait during the parsing")
         #th_init = threading.Thread(target=init,args=([],root_dir))
         #th_init.start()
         #th_init.join()
         self.threadpool = QThreadPool()
         worker = Worker()
-        self.threadpool.start(worker)
+        self.threadpool.start(worker)'''
 
 
 
 class Worker(QRunnable):
     def run(self):
-        init(logs, prgss)
+        self.tuple=init(logs, prgss)
         time.sleep(5)
 
 class Logs(QWidget):
@@ -167,8 +171,13 @@ class Logs(QWidget):
         #print("created")
     def update(self, value,total):
         prgss.signal_update.emit(int(value/total)*100)
+        print(value,total)
         if(value==total):
+            print("value=total")
+            #wait(1)
             prgss.close()
+            prgss.setVisible(False)
+
 
 
 class ProgressBar(QProgressDialog):
@@ -180,19 +189,28 @@ class ProgressBar(QProgressDialog):
         self.setMinimumDuration(0) # Sets how long the loop should last before progress bar is shown (in miliseconds)
         self.setWindowTitle("Creating directories")
         self.setModal(True)
+        #self.setWindowModality(Qt::WindowModal)
 
         self.setValue(0)
         self.setMinimum(0)
         self.setMaximum(max)
         self.signal_update.connect(self.update)
+        #self.setAutoReset(True)
+        #self.setAutoClose(True)
+        #self.setAttribute(Qt::WA_DeleteOnClose, true);
         self.show()
 
     def update(self, value):
+        print(value)
         self.setValue(value)
         self.show()
+        if value==100:
+           self.close()
 
-    def close(self):
-        self.close()
+    #def close(self):
+    #    print("allo",self.wasCanceled())
+    #    self.close()
+    #    self.setVisible(False)
 
 '''class ProgressBar():
     def __init__(self):
@@ -244,7 +262,7 @@ if __name__ == '__main__':
     #grid.addWidget(button,2,3)
 
     win.setLayout(grid)
-    win.setGeometry(100,100,200,100)
+    win.setGeometry(50,50,100,200)
     win.setWindowTitle("Logiciel Bioinformatique")
     win.show()
     button_init.initialisation()
