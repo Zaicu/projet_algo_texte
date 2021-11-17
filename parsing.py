@@ -414,7 +414,6 @@ def name_to_id(ids_files):
 		for line in file:
 			split_string = line.split("\t")
 			dict[split_string[5]] = split_string[1]
-	print(dict)
 	return dict
 
 def create_tree(overview_lines, ids_files, logs, prgss):
@@ -513,11 +512,11 @@ def init(logs, prgss, filtre=['']):
 
 	download(logs)
 	# Ouvrir le fichier en lecture seule
-	overview        = open('GENOME_REPORTS/overview.txt'     , "r")
-	archaea_ids     = open('GENOME_REPORTS/IDS/Archaea.ids'  , "r")
-	bacteria_ids    = open('GENOME_REPORTS/IDS/Bacteria.ids' , "r")
-	eukaryota_ids   = open('GENOME_REPORTS/IDS/Eukaryota.ids', "r")
-	viruses_ids     = open('GENOME_REPORTS/IDS/Viruses.ids'  , "r")
+	overview        = open(os.path.join("GENOME_REPORTS", "overview.txt"        ), "r")
+	archaea_ids     = open(os.path.join("GENOME_REPORTS", "IDS", "Archaea.ids"  ), "r")
+	bacteria_ids    = open(os.path.join("GENOME_REPORTS", "IDS", "Bacteria.ids" ), "r")
+	eukaryota_ids   = open(os.path.join("GENOME_REPORTS", "IDS", "Eukaryota.ids"), "r")
+	viruses_ids     = open(os.path.join("GENOME_REPORTS", "IDS", "Viruses.ids"  ), "r")
 
 	# utiliser readlines pour lire toutes les lignes du fichier
 	# La variable "lignes" est une liste contenant toutes les lignes du fichier
@@ -527,7 +526,6 @@ def init(logs, prgss, filtre=['']):
 	eukaryota_lines = eukaryota_ids.readlines()
 	viruses_lines   = viruses_ids.readlines()
 	ids_files       = [archaea_lines, bacteria_lines, eukaryota_lines, viruses_lines]
-	print(archaea_lines[4])
 
 	# fermez le fichier après avoir lu les lignes
 	overview.close()
@@ -546,7 +544,7 @@ def init(logs, prgss, filtre=['']):
 
 	# A retirer après
 
-	associate(ids, paths, dates, "Results/Viruses/Other")
+	associate(ids, paths, dates, os.path.join("Results", "Viruses", "Other"))
 
 	return (ids, paths, dates)
 
@@ -556,7 +554,7 @@ Entrez.email = "thmslpn@gmail.com"
 
 if __name__ == "__main__":
 	#init()
-	directory_parsing = "Results/Viruses/Other"
+	directory_parsing = os.path.join("Results", "Viruses", "Other")
 	(ids, paths, dates) = init(sys.stdout)
 	#path => reduire mes listes en fonction de ce qui est selectionné
 	if not ids == "":
