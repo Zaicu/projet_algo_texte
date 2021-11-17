@@ -282,6 +282,7 @@ def parsing(data):
 	reduced_ids   = data[0]
 	reduced_paths = data[1]
 	reduced_dates = data[2]
+	today_ids     = data[3]
 
 	i = 0
 	lenght = len(reduced_ids)
@@ -335,18 +336,16 @@ cores = 3 #Number of CPU cores on your system
 partitions = cores #Define as many partitions as you want
 # export CLOUDSDK_PYTHON=/usr/bin/python3.7
 
-def parallelize(reduced_ids, reduced_paths, reduced_dates, func):
+def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, func):
 	reduced_ids_split   = np.array_split(reduced_ids  , partitions)
 	reduced_paths_split = np.array_split(reduced_paths, partitions)
 	reduced_dates_split = np.array_split(reduced_dates, partitions)
-	data_split = [(reduced_ids, reduced_paths, reduced_dates) for (reduced_ids, reduced_paths, reduced_dates) in zip(reduced_ids_split, reduced_paths_split, reduced_dates_split)]
+	data_split = [(reduced_ids, reduced_paths, reduced_dates, today_ids) for (reduced_ids, reduced_paths, reduced_dates) in zip(reduced_ids_split, reduced_paths_split, reduced_dates_split)]
 	pool = Pool(cores)
 	pool.map(func, data_split)
 	pool.close()
 	pool.join()
 	return
-
-today_ids = []
 
 def associate(ids, paths, dates, directory_parsing):
 	ids    = ids.split(',')
@@ -356,6 +355,8 @@ def associate(ids, paths, dates, directory_parsing):
 	reduced_ids   = []
 	reduced_paths = []
 	reduced_dates = []
+
+	today_ids     = []
 
 	for id, path, date in zip(ids, paths, dates):
 		if directory_parsing in path:
@@ -388,7 +389,7 @@ def associate(ids, paths, dates, directory_parsing):
 	today = open("today", "a")
 
 	#Parsing
-	parallelize(np.array(reduced_ids), np.array(reduced_paths), np.array(reduced_dates), parsing)
+	parallelize(np.array(reduced_ids), np.array(reduced_paths), np.array(reduced_dates), today_ids, parsing)
 
 	today.close()
 	#tab_group = fgroup.split(',')
@@ -397,6 +398,7 @@ def associate(ids, paths, dates, directory_parsing):
 	#for i in range(len(tab_group)-1):
 		#print(paths[i] + '\t' + tab_group[i], file=index)
 
+# Inutile maintenant, version de backup au cas où
 def find_ids(file, entity_name):
 	# iterate over lines, and print out line numbers which contain
 	# the word of interest.
@@ -404,12 +406,24 @@ def find_ids(file, entity_name):
 		split_string = line.split("\t")
 		if entity_name in split_string: # or word in line.split() to search for full words
 			return split_string[1]
+	#print(split_string[1])
+
+def name_to_id(ids_files):
+	dict = {}
+	for file in ids_files:
+		for line in file:
+			split_string = line.split("\t")
+			dict[split_string[5]] = split_string[1]
+	print(dict)
+	return dict
 
 def create_tree(overview_lines, ids_files, logs, prgss):
 
 	ids   = ""
 	paths = ""
 	dates = ""
+
+	name_to_id_dict = name_to_id(ids_files)
 
 	all_entity_id = []
 	r = re.compile(".*txt")
@@ -440,11 +454,6 @@ def create_tree(overview_lines, ids_files, logs, prgss):
 		new_name = new_name.replace(")", "")
 		new_name = new_name.replace(".", "")
 
-		"""if root_dir == "GENOME_REPORTS":
-			path = ('Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')
-		else :
-			path = root_dir.replace(SEP+"GENOME_REPORTS",'').replace("GENOME_REPORTS",'')+( SEP+'Results'+SEP+split_string[1]+SEP+split_string[2]+SEP+split_string[3]+SEP+split_string[0]).replace(' ','_').replace(':','_')"""
-
 		# Si la ligne n'est pas conforme on ne la traite pas
 		if len(split_string) < 4:
 			continue
@@ -461,7 +470,9 @@ def create_tree(overview_lines, ids_files, logs, prgss):
 			kingdom = 3
 
 		if kingdom == 0 or kingdom == 1 or kingdom == 2 or kingdom == 3:
-			entity_id = str(find_ids(ids_files[kingdom], split_string[0]))
+			#entity_id = str(find_ids(ids_files[kingdom], split_string[0])) # J'imagine que c'est ça qui prend du temps
+			if split_string[0] in name_to_id_dict:
+				entity_id = name_to_id_dict[split_string[0]]
 
 		if not entity_id == "None":
 			if not os.path.isdir(path):
@@ -484,6 +495,7 @@ def create_tree(overview_lines, ids_files, logs, prgss):
 			paths = paths + path      + ","
 			dates = dates + date      + ","
 
+	prgss.signal_update.emit(100)
 
 	return (ids[:-1], paths[:-1], dates[:-1])
 
@@ -515,6 +527,7 @@ def init(logs, prgss, filtre=['']):
 	eukaryota_lines = eukaryota_ids.readlines()
 	viruses_lines   = viruses_ids.readlines()
 	ids_files       = [archaea_lines, bacteria_lines, eukaryota_lines, viruses_lines]
+	print(archaea_lines[4])
 
 	# fermez le fichier après avoir lu les lignes
 	overview.close()
