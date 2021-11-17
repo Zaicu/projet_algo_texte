@@ -3,6 +3,9 @@ from Bio.SeqIO import parse
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
 from Bio import Entrez
+import numpy as np
+from multiprocessing import Pool
+import threading
 
 import re
 import urllib.request
@@ -14,6 +17,8 @@ import datetime # C'est à enlever des qu'on a résolu le problème de date
 
 if platform.system() == "Windows": SEP = "\\"
 else: SEP = "/"
+
+lock = threading.Lock()
 
 def download_file(url, dir, logs):
 	if not os.path.isdir(dir):
@@ -273,9 +278,75 @@ def progress(count, total, status=''):
 	sys.stdout.write('[%s] %s%s | %s\r' % (bar, percents, '%', status))
 	sys.stdout.flush()
 
-#def separate(ids, paths, dates):
-#	return
+def parsing(data):
+	reduced_ids   = data[0]
+	reduced_paths = data[1]
+	reduced_dates = data[2]
 
+	i = 0
+	lenght = len(reduced_ids)
+	#handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=ids)
+	fgroup = ""
+	for entity_id, path, date in zip(reduced_ids, reduced_paths, reduced_dates):
+
+		i = i + 1
+		print(f'{i}/{lenght}')
+
+		if entity_id in today_ids:
+			continue
+
+		seq_record = get_record(entity_id)
+
+		if not date_compare(date, seq_record.annotations.get("date")):
+			lock.acquire(blocking=True)
+			today = open("today", "a")
+			today.write(entity_id + '\n')
+			today.close()
+			lock.release()
+			continue
+
+		date_file = open(os.path.join(path, "date.dat"), "w") # mettre à jour le date.dat
+		date_file.write(seq_record.annotations.get("date"))
+		date_file.close()
+
+
+		function_group = []
+		for f in seq_record.features:
+			if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
+				function_group.append(str(f.type))
+		function_group = list(dict.fromkeys(function_group)) # retire les doublons dans la liste function_group
+		print(function_group)
+
+		print(os.path.join(path, entity_id))
+		write_seq(os.path.join(path, entity_id), seq_record)
+
+		lock.acquire(blocking=True)
+		today = open("today", "a")
+		today.write(entity_id + '\n')
+		today.close()
+		lock.release()
+
+		#fgroup = fgroup + functiongroup + ","
+
+		#print(paths[i] + '\t' +entity_id + functiongroup, file=index)
+	return
+
+cores = 3 #Number of CPU cores on your system
+partitions = cores #Define as many partitions as you want
+# export CLOUDSDK_PYTHON=/usr/bin/python3.7
+
+def parallelize(reduced_ids, reduced_paths, reduced_dates, func):
+	reduced_ids_split   = np.array_split(reduced_ids  , partitions)
+	reduced_paths_split = np.array_split(reduced_paths, partitions)
+	reduced_dates_split = np.array_split(reduced_dates, partitions)
+	data_split = [(reduced_ids, reduced_paths, reduced_dates) for (reduced_ids, reduced_paths, reduced_dates) in zip(reduced_ids_split, reduced_paths_split, reduced_dates_split)]
+	pool = Pool(cores)
+	pool.map(func, data_split)
+	pool.close()
+	pool.join()
+	return
+
+today_ids = []
 
 def associate(ids, paths, dates, directory_parsing):
 	ids    = ids.split(',')
@@ -303,8 +374,6 @@ def associate(ids, paths, dates, directory_parsing):
 	else:
 		date_ids = ""	# Si today n'est pas créer, on le crée dans le prochain else
 
-	today_ids = []
-
 	if date_ids == today_date:
 		print('a')
 		today = open("today", "r")
@@ -318,46 +387,8 @@ def associate(ids, paths, dates, directory_parsing):
 
 	today = open("today", "a")
 
-	#((reduced_ids_1, reduced_paths_1, reduced_dates_1),
-	# (reduced_ids_2, reduced_paths_2, reduced_dates_2),
-	# (reduced_ids_3, reduced_paths_3, reduced_dates_3)) = separate(reduced_ids, reduced_paths, reduced_dates)
-
-	i = 0
-	#handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=ids)
-	fgroup = ""
-	for entity_id, path, date in zip(reduced_ids, reduced_paths, reduced_dates):
-
-		i = i + 1
-		print(f'{i}/{lenght}')
-
-		if entity_id in today_ids:
-			continue
-
-		seq_record = get_record(entity_id)
-
-		if not date_compare(date, seq_record.annotations.get("date")):
-			today.write(entity_id + '\n')
-			continue
-
-		date_file = open(os.path.join(path, "date.dat"), "w") # mettre à jour le date.dat
-		date_file.write(seq_record.annotations.get("date"))
-		date_file.close()
-
-
-		function_group = []
-		for f in seq_record.features:
-			if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
-				function_group.append(str(f.type))
-		function_group = list(dict.fromkeys(function_group)) # retire les doublons dans la liste function_group
-		print(function_group)
-
-		print(os.path.join(path, entity_id))
-		write_seq(os.path.join(path, entity_id), seq_record)
-		today.write(entity_id + '\n')
-
-		#fgroup = fgroup + functiongroup + ","
-
-		#print(paths[i] + '\t' +entity_id + functiongroup, file=index)
+	#Parsing
+	parallelize(np.array(reduced_ids), np.array(reduced_paths), np.array(reduced_dates), parsing)
 
 	today.close()
 	#tab_group = fgroup.split(',')
@@ -499,8 +530,12 @@ def init(logs, prgss, filtre=['']):
 
 	(ids, paths, dates) = create_tree(overview_lines, ids_files, logs, prgss)
 	logs.write("Tree done")
-	return (ids, paths, dates)
 
+	# A retirer après
+
+	associate(ids, paths, dates, "Results/Viruses/Other")
+
+	return (ids, paths, dates)
 
 ## --------------------------------------------------------------------------- ##
 
