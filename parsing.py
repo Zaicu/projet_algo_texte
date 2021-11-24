@@ -122,7 +122,7 @@ def date_compare(old_date, new_date): #compare les dates et renvoie un booléen 
 	return olddate < newdate
 
 def get_record(entity_id):
-	handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=entity_id)
+	handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=entity_id) # https://www.ncbi.nlm.nih.gov/books/NBK25499/
 	record = SeqIO.read(handle, "gb")
 	handle.close()
 	return record
@@ -278,6 +278,17 @@ def progress(count, total, status=''):
 	sys.stdout.write('[%s] %s%s | %s\r' % (bar, percents, '%', status))
 	sys.stdout.flush()
 
+class myThread (threading.Thread):
+	def __init__(self, threadID, name, data):
+		threading.Thread.__init__(self)
+		self.threadID = threadID
+		self.name = name
+		self.data = data
+	def run(self):
+		print("Starting " + self.name)
+		parsing(self.data)
+		print("Exiting " + self.name)
+
 def parsing(data):
 	reduced_ids   = data[0]
 	reduced_paths = data[1]
@@ -285,6 +296,9 @@ def parsing(data):
 	today_ids     = data[3]
 
 	i = 0
+	print("reduced_ids : ", len(reduced_ids))
+	print("reduced_paths : ", len(reduced_paths))
+	print("reduced_dates : ", len(reduced_dates))
 	lenght = len(reduced_ids)
 	#handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=ids)
 	fgroup = ""
@@ -332,19 +346,35 @@ def parsing(data):
 		#print(paths[i] + '\t' +entity_id + functiongroup, file=index)
 	return
 
-cores = 3 #Number of CPU cores on your system
-partitions = cores #Define as many partitions as you want
-# export CLOUDSDK_PYTHON=/usr/bin/python3.7
-
 def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, func):
+	cores = 2 #Number of CPU cores on your system
+	partitions = cores #Define as many partitions as you want
+	# export CLOUDSDK_PYTHON=/usr/bin/python3.7
+
 	reduced_ids_split   = np.array_split(reduced_ids  , partitions)
 	reduced_paths_split = np.array_split(reduced_paths, partitions)
 	reduced_dates_split = np.array_split(reduced_dates, partitions)
 	data_split = [(reduced_ids, reduced_paths, reduced_dates, today_ids) for (reduced_ids, reduced_paths, reduced_dates) in zip(reduced_ids_split, reduced_paths_split, reduced_dates_split)]
-	pool = Pool(cores)
-	pool.map(func, data_split)
-	pool.close()
-	pool.join()
+	#pool = Pool(cores)
+	#pool.map(func, data_split)
+	#pool.close()
+	#pool.join()
+
+	# Create new threads
+	thread1 = myThread(1, "Thread-1", data_split[0])
+	thread2 = myThread(2, "Thread-2", data_split[1])
+	#thread3 = myThread(3, "Thread-3", data_split[2])
+
+	# Start new Threads
+	thread1.start()
+	thread2.start()
+	#thread3.start()
+
+	# Wait for the threads
+	thread1.join()
+	thread2.join()
+	#thread3.join()
+
 	return
 
 def associate(ids, paths, dates, directory_parsing):
@@ -386,12 +416,12 @@ def associate(ids, paths, dates, directory_parsing):
 		today.write(today_date + '\n')
 		today.close()
 
-	today = open("today", "a")
+	#today = open("today", "a")
 
 	#Parsing
 	parallelize(np.array(reduced_ids), np.array(reduced_paths), np.array(reduced_dates), today_ids, parsing)
 
-	today.close()
+	#today.close()
 	#tab_group = fgroup.split(',')
 	#paths = path.split(',')
 
@@ -544,7 +574,10 @@ def init(logs, prgss, filtre=['']):
 
 	# A retirer après
 
-	associate(ids, paths, dates, os.path.join("Results", "Viruses", "Other"))
+	associate(ids, paths, dates, os.path.join("Results"))
+	# os.path.join("Results", "Bacteria", "Terrabacteria_group")
+	# os.path.join("Results","Viruses","Other","Geminiviridae") crash
+
 
 	return (ids, paths, dates)
 
@@ -554,7 +587,7 @@ Entrez.email = "thmslpn@gmail.com"
 
 if __name__ == "__main__":
 	#init()
-	directory_parsing = os.path.join("Results", "Viruses", "Other")
+	directory_parsing = os.path.join("Results")
 	(ids, paths, dates) = init(sys.stdout)
 	#path => reduire mes listes en fonction de ce qui est selectionné
 	if not ids == "":
