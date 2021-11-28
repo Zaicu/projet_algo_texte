@@ -64,38 +64,6 @@ def parse_location(location):
 	loc = loc.replace("order", "")
 	return loc
 
-
-def write_seq(file_path, gb_record):
-	#old_stdout = sys.stdout
-	#new_stdout = io.StringIO()
-	#sys.stdout = new_stdout
-	file = open(file_path, "w")
-	function_group = []
-	features = gb_record.features
-
-	for f in features:
-		if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
-			loc = str(f.location)
-			coord = parse_location(loc)
-			coord = coord.split(' ')
-			int_coord = []
-			for num in coord:
-				int_coord.append(int(num))
-			if not "join" in loc and not "complement" in loc:
-				inf, sup = min(int_coord), max(int_coord)
-				file.write("%s\t%d..%d\n" % (f.type, inf, sup))
-				file.write(str(gb_record.seq[inf:sup]) + '\n\n')
-			if "complement" in loc and not "join" in loc:
-				inf, sup = min(int_coord), max(int_coord)
-				file.write("%s\tcomplement(%d..%d)\n" % (f.type, inf, sup))
-				file.write(str(gb_record.seq[inf:sup]) + '\n\n')
-			if "join" in loc:
-				join(int_coord, gb_record.seq, f, file)
-	#output = new_stdout.getvalue()
-	#print(output)
-	#sys.stdout = old_stdout
-	file.close()
-
 def date_convert(date): #mettre la date dans un format exploitable afin de les comparer numériquement
 	date = date.replace("JAN", "01")
 	date = date.replace("FEB", "02")
@@ -289,11 +257,88 @@ class myThread (threading.Thread):
 		parsing(self.data)
 		print("Exiting " + self.name)
 
+class Coordinate:
+	def __init__(self, coord, len_record):
+		coord_parse = re.sub('\[([0-9]+):([0-9]+)\]\((\+|\-)\)', "\g<1>\t\g<2>\t\g<3>", coord)
+
+		# Vérifier que le min et max sont bien dans la longueur de la séquence, et que min < max
+		if coord_parse != coord:
+			coord_parse = coord_parse.split("\t")
+			min = int(coord_parse[0])
+			max = int(coord_parse[1])
+			if coord_parse[2] == "+":
+				complement = False
+			else:
+				complement = True
+			if min >= max or max > len_record:
+				min        = None
+				max        = None
+				complement = None
+
+		else:
+			min        = None
+			max        = None
+			complement = None
+		# reverse_complement(), regarder le tutorial sur le site internet https://www.tutorialspoint.com/biopython/biopython_advanced_sequence_operations.htm
+
+class Location:
+	def __init__(self, loc, len_record):
+		loc_parse = re.sub('join{(.*)}', "\g<1>", loc)
+
+		if loc_parse == loc:
+			coordinate = Coordinate(loc, len_record)
+			join       = False
+
+		else:
+			coord_tab  = loc_parse.replace(" ","").split(",")
+			coordinate = []
+			for coord in coord_tab:
+				coordinate.append(Coordinate(coord, len_record))
+			join       = True
+
+		#si join == True, alors vérifier que les séquences du join ne s'entrecroisent pas
+
+
+def write_seq(file_path, gb_record, group):
+	#old_stdout = sys.stdout
+	#new_stdout = io.StringIO()
+	#sys.stdout = new_stdout
+	file           = open(file_path, "w")
+	function_group = []
+	features       = gb_record.features
+	len_record     = len(gb_record.seq)
+
+	for f in features:
+		if f.type == group:
+			loc = str(f.location)
+			print(loc)
+			location = Location(loc, len_record)
+			coord = parse_location(loc)
+			coord = coord.split(' ')
+			int_coord = []
+			for num in coord:
+				int_coord.append(int(num))
+			if not "join" in loc and not "complement" in loc:
+				inf, sup = min(int_coord), max(int_coord)
+				file.write("%s\t%d..%d\n" % (f.type, inf, sup))
+				file.write(str(gb_record.seq[inf:sup]) + '\n\n')
+			if "complement" in loc and not "join" in loc:
+				inf, sup = min(int_coord), max(int_coord)
+				file.write("%s\tcomplement(%d..%d)\n" % (f.type, inf, sup))
+				file.write(str(gb_record.seq[inf:sup]) + '\n\n')
+			if "join" in loc:
+				join(int_coord, gb_record.seq, f, file)
+	#output = new_stdout.getvalue()
+	#print(output)
+	#sys.stdout = old_stdout
+	file.close()
+
 def parsing(data):
 	reduced_ids   = data[0]
 	reduced_paths = data[1]
 	reduced_dates = data[2]
 	today_ids     = data[3]
+	list_group    = data[4]
 
 	i = 0
 	print("reduced_ids : ", len(reduced_ids))
@@ -307,8 +352,10 @@ def parsing(data):
 		i = i + 1
 		print(f'{i}/{lenght}')
 
-		if entity_id in today_ids:
+		if entity_id in today_ids: #faut changer le truc des dates et faire par group aussi
 			continue
+
+		organism_name = os.path.basename(path)
 
 		seq_record = get_record(entity_id)
 
@@ -327,13 +374,14 @@ def parsing(data):
 
 		function_group = []
 		for f in seq_record.features:
-			if f.type == "CDS" or f.type == "centromere" or f.type == "intron" or f.type == "mobile_element" or f.type == "ncRNA" or f.type == "rRNA" or f.type == "telomere" or f.type == "tRNA" or f.type == "3'UTR" or f.type == "5'UTR":
+			if f.type in list_group:
 				function_group.append(str(f.type))
 		function_group = list(dict.fromkeys(function_group)) # retire les doublons dans la liste function_group
 		print(function_group)
 
-		print(os.path.join(path, entity_id))
-		write_seq(os.path.join(path, entity_id), seq_record)
+		for group in function_group:
+			print(os.path.join(path, group + " " + organism_name + " " + entity_id + ".txt"))
+			write_seq(os.path.join(path, group + " " + organism_name + " " + entity_id + ".txt"), seq_record, group) #le seq_record il faut le réduire pour qu'il corresponde au group uniquement (pour le moment je le garde en entier et je traite dans write_seq)
 
 		lock.acquire(blocking=True)
 		today = open("today", "a")
@@ -346,7 +394,7 @@ def parsing(data):
 		#print(paths[i] + '\t' +entity_id + functiongroup, file=index)
 	return
 
-def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, func):
+def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, list_group, func):
 	cores = 2 #Number of CPU cores on your system
 	partitions = cores #Define as many partitions as you want
 	# export CLOUDSDK_PYTHON=/usr/bin/python3.7
@@ -354,11 +402,7 @@ def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, func):
 	reduced_ids_split   = np.array_split(reduced_ids  , partitions)
 	reduced_paths_split = np.array_split(reduced_paths, partitions)
 	reduced_dates_split = np.array_split(reduced_dates, partitions)
-	data_split = [(reduced_ids, reduced_paths, reduced_dates, today_ids) for (reduced_ids, reduced_paths, reduced_dates) in zip(reduced_ids_split, reduced_paths_split, reduced_dates_split)]
-	#pool = Pool(cores)
-	#pool.map(func, data_split)
-	#pool.close()
-	#pool.join()
+	data_split = [(reduced_ids, reduced_paths, reduced_dates, today_ids, list_group) for (reduced_ids, reduced_paths, reduced_dates) in zip(reduced_ids_split, reduced_paths_split, reduced_dates_split)]
 
 	# Create new threads
 	thread1 = myThread(1, "Thread-1", data_split[0])
@@ -377,7 +421,7 @@ def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, func):
 
 	return
 
-def associate(ids, paths, dates, directory_parsing):
+def associate(ids, paths, dates, directory_parsing, list_group):
 	ids    = ids.split(',')
 	paths  = paths.split(',')
 	dates  = dates.split(',')
@@ -419,7 +463,7 @@ def associate(ids, paths, dates, directory_parsing):
 	#today = open("today", "a")
 
 	#Parsing
-	parallelize(np.array(reduced_ids), np.array(reduced_paths), np.array(reduced_dates), today_ids, parsing)
+	parallelize(np.array(reduced_ids), np.array(reduced_paths), np.array(reduced_dates), today_ids, list_group, parsing)
 
 	#today.close()
 	#tab_group = fgroup.split(',')
@@ -517,8 +561,8 @@ def create_tree(overview_lines, ids_files, logs, prgss):
 			else:
 				date = ""
 
-			file  = open(path_entity_id, "a") #crée le fichier NC # Je sais pas si il faudrait pas faire ca plus tard dans l'algo (je pense que si)
-			file.close()
+			#file  = open(path_entity_id, "a") #crée le fichier NC # Je sais pas si il faudrait pas faire ca plus tard dans l'algo (je pense que si)
+			#file.close()
 
 			ids   = ids   + entity_id + ","
 			paths = paths + path      + ","
@@ -574,7 +618,7 @@ def init(logs, prgss, filtre=['']):
 
 	# A retirer après
 
-	associate(ids, paths, dates, os.path.join("Results"))
+	associate(ids, paths, dates, os.path.join("Results"), ["CDS", "centromere", "intron", "mobile_element", "ncRNA", "rRNA", "telomere", "tRNA", "3'UTR", "5'UTR"])
 	# os.path.join("Results", "Bacteria", "Terrabacteria_group")
 	# os.path.join("Results","Viruses","Other","Geminiviridae") crash
 
@@ -592,5 +636,6 @@ if __name__ == "__main__":
 	#path => reduire mes listes en fonction de ce qui est selectionné
 	if not ids == "":
 		print("ok")
-		associate(ids, paths, dates, directory_parsing)
+		list_group = ["CDS", "centromere", "intron", "mobile_element", "ncRNA", "rRNA", "telomere", "tRNA", "3'UTR", "5'UTR"]
+		associate(ids, paths, dates, directory_parsing, list_group)
 	#parse(['tRNA'])
