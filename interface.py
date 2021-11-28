@@ -3,7 +3,7 @@ import os
 import time
 import platform
 import inspect
-from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel, QDialog, QProgressDialog, QButtonGroup
+from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel, QDialog, QProgressDialog, QButtonGroup, QLineEdit
 from PyQt5.QtCore import QModelIndex, QRunnable, QThreadPool, QThread, pyqtSignal, Qt, QThread, QObject
 
 src_file_path = inspect.getfile(lambda: None)
@@ -21,7 +21,7 @@ class FileSystemView(QWidget):
     def __init__(self, dir_path):
         self.path = "blank"
         super().__init__()
-        appWidth = 800
+        appWidth = 1000
         appHeight = 300
         self.setWindowTitle('File System Viewer')
         self.setGeometry(300, 300, appWidth, appHeight)
@@ -54,8 +54,10 @@ class Menu(QWidget):
     def __init__(self,list):
         super().__init__()
         layout = QGridLayout()
+        self.regions_group = QButtonGroup(self)
+
         self.setLayout(layout)
-        regions_group = QButtonGroup(self)
+        self.nb = len(list)
         for i in range(len(list)):
             content = list.pop()
             radiobutton=QRadioButton(content)
@@ -65,8 +67,8 @@ class Menu(QWidget):
             radiobutton.content = content
             radiobutton.toggled.connect(self.onClicked)
             layout.addWidget(radiobutton, i, 0)
-            regions_group.addButton(radiobutton)
-        regions_group.setExclusive(False)
+            self.regions_group.addButton(radiobutton)
+        self.regions_group.setExclusive(False)
 
 
     def onClicked(self):
@@ -76,40 +78,54 @@ class Menu(QWidget):
         else :
             self.content.remove(radioButton.content)
 
+    def select_all(self):
+        for button in self.regions_group.buttons():
+            button.setChecked(True)
 
-'''
-class Button(QWidget):
-    def __init__(self,menu1,menu2):
+    def unselect_all(self):
+        for button in self.regions_group.buttons():
+            button.setChecked(False)
+
+
+class Button_regions(QWidget):
+    def __init__(self,menu):
         super().__init__()
 
-
-        entree = QPushButton('Parse', self)
+        self.menu = menu
+        self.total = menu.nb
+        entree = QPushButton('Select/Unselect all regions', self)
         entree.setCheckable(True)
 
-        entree.clicked.connect(self.parse)
-        entree.setStyleSheet("margin: 1px; padding: 10px; \
-                           background-color: lightgray; \
-                           border-style: solid; \
-                           border-radius: 4px; border-width: 3px; \
-                           border-color: slategray;")
+        entree.clicked.connect(self.select)
+        #entree.setStyleSheet("margin: 1px; padding: 10px; \
+        #                   background-color: lightgray; \
+         #                  border-style: solid; \
+          #                 border-radius: 4px; border-width: 3px; \
+           #                border-color: slategray;")
         layout = QVBoxLayout()
+        entree.setMaximumSize(200,30)
         layout.addWidget(entree)
         self.setLayout(layout)
-    def parse(self) :
-        if(tree.path != "blank"):
-            logs.write_parse(tree.path+ " - ",menu_regions.content)
-            associate([menu_regions.content,tree.content])
-            logs.write("Parsing terminé")
-'''
+
+
+    def select(self) :
+        self.selected=self.menu.content
+        if len(self.selected)==self.total:
+            self.menu.unselect_all()
+        else :
+            self.menu.select_all()
+
+
 
 class Button_init(QWidget):
 
-    def __init__(self,menu1,menu2):
+    def __init__(self,menu1,menu2,text):
         super().__init__()
 
 
         self.entree = QPushButton('Parse', self)
         self.entree.setCheckable(True)
+        self.text = text.qle
 
         self.entree.clicked.connect(self.parse)
         self.entree.setStyleSheet("margin: 1px; padding: 10px; \
@@ -124,6 +140,8 @@ class Button_init(QWidget):
 
     def process_results(self,tuple):
         self.list_init=tuple
+        logs.write("You can now parse")
+        #print(self.list_init)
 
     def initialisation(self):
         logs.write("Please wait during the download")
@@ -134,16 +152,54 @@ class Button_init(QWidget):
 
     def parse(self) :
         if(tree.path != "blank"):
-            logs.write_parse(tree.path+ " - ",menu_regions.content)
-            associate([menu_regions.content,tree.content])
-            logs.write("Parsing terminé")
-        '''logs.write("Please wait during the parsing")
-        #th_init = threading.Thread(target=init,args=([],root_dir))
-        #th_init.start()
-        #th_init.join()
-        self.threadpool = QThreadPool()
-        worker = Worker()
-        self.threadpool.start(worker)'''
+            to_write =''
+            for i in range(len(menu_regions.content)):
+                if i==len(menu_regions.content)-1:
+                    to_write+=menu_regions.content[i]
+                else:
+                    to_write+=menu_regions.content[i]+", "
+            if self.text.text():
+                if len(menu_regions.content)==0:
+                    to_write+=self.text.text()
+                else:
+                    to_write+=", "+self.text.text()
+            logs.write_parse(tree.path+ " - ",to_write)
+            parse_worker = Worker_parse()
+            if self.text.text():
+                parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content+[self.text.text()])
+            else:
+                parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content)
+            self.threadpool.start(parse_worker)
+            parse_worker.signal.finished.connect(self.finished)
+
+        else:
+            to_write =''
+            for i in range(len(menu_regions.content)):
+                if i==len(menu_regions.content)-1:
+                    to_write+=menu_regions.content[i]
+                else:
+                    to_write+=menu_regions.content[i]+", "
+            if self.text.text():
+                if len(menu_regions.content)==0:
+                    to_write+=self.text.text()
+                else:
+                    to_write+=", "+self.text.text()
+            logs.write_parse("Archaea, Bacteria, Eukaryota, Viruses"+ " - ",to_write)
+            parse_worker = Worker_parse()
+            if self.text.text():
+                parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content+[self.text.text()])
+            else:
+                parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content)
+
+            self.threadpool.start(parse_worker)
+            parse_worker.signal.finished.connect(self.finished)
+            #self.threadpool.waitForDone()
+            #associate(self.list_init[0], self.list_init[1], self.list_init[2],tree.content,menu_regions.content)
+            #associate([menu_regions.content,tree.content])
+
+
+    def finished(self):
+        logs.write("Parsing terminé")
 
 class WorkerSignals(QObject):
     result = pyqtSignal(list)
@@ -160,6 +216,41 @@ class Worker(QRunnable):
         self.signals.result.emit(self.list)
 
 
+class Signals(QObject):
+    finished = pyqtSignal()
+
+class Worker_parse(QRunnable):
+    def __init__(self):
+        super(Worker_parse, self).__init__()
+        self.signal = Signals()
+
+    def set_param(self,list_init, tree, regions):
+        self.list_init=list_init
+        self.tree=tree
+        self.regions=regions
+
+    def run(self):
+        associate(self.list_init[0], self.list_init[1], self.list_init[2],self.tree,self.regions)
+        time.sleep(5)
+        self.signal.finished.emit()
+
+class FreeText(QWidget):
+
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+
+        hbox = QVBoxLayout(self)
+        self.qle = QLineEdit(self)
+
+        self.label = QLabel("Free region text :")
+        hbox.addWidget(self.label)
+
+        hbox.addSpacing(20)
+        hbox.addWidget(self.qle)
+        self.setLayout(hbox)
 
 class Logs(QWidget):
     def __init__(self):
@@ -176,7 +267,7 @@ class Logs(QWidget):
     def write_parse(self, kingdom, region):
         if len(self.text.list) > 10 :
             del(self.text.list[1])
-        add = "Parsing en cours : "+ kingdom + region
+        add = "Ongoing parsing : "+ kingdom + region
         self.text.list.append("\n" + add)
         self.text.setText(" ".join(self.text.list))
     def write(self, text):
@@ -218,6 +309,7 @@ class ProgressBar(QProgressDialog):
         #self.setAutoReset(True)
         #self.setAutoClose(True)
         #self.setAttribute(Qt::WA_DeleteOnClose, true);
+        self.resize(300,100)
         self.show()
 
     def update(self, value):
@@ -232,26 +324,6 @@ class ProgressBar(QProgressDialog):
     #    self.close()
     #    self.setVisible(False)
 
-'''class ProgressBar():
-    def __init__(self):
-        super().__init__()
-
-    def create(self,total):
-        self.dialog = QProgressDialog("Creating directories...", "Abort tree creation", 0, total)
-        self.signal_update=pyqtSignal()
-        self.signal_update.connect(self.update)
-        self.dialog.show()
-
-    def update(self, value):
-        self.dialog.setValue(value)
-        QApplication.processEvents()
-
-    def setWindowModality(self,text):
-        self.dialog.setWindowModality(text)
-
-    def close(self):
-        if self.dialog:
-            self.dialog.close()'''
 
 if __name__ == '__main__':
     if not os.path.isdir(root_dir + SEP+ "GENOME_REPORTS"):
@@ -266,23 +338,30 @@ if __name__ == '__main__':
     grid = QGridLayout()
     win = QWidget()
     tree = FileSystemView(dir)
+
     #menu_kingdom = Menu(["Eucaryota", "Bacteria", "Archaea","Virus","Plasmides", "Organelle"])
     menu_regions = Menu(["5'UTR","3'UTR","tRNA","telomere","rRNA","ncRNA","mobile_element","intron","centromere","CDS"])
     logs = Logs()
     prgss = ProgressBar(100)
     prgss.setVisible(False)
-    #button = Button(tree, menu_regions)
-    button_init = Button_init(tree, menu_regions)
+    freetext = FreeText()
 
-    grid.addWidget(tree,1,1,5,1)
-    grid.addWidget(logs,3,2,2,1)
+    button_select = Button_regions(menu_regions)
+    button_init = Button_init(tree, menu_regions, freetext)
+    label_menu = QLabel("Select one or several region(s) :")
+
+    grid.addWidget(tree,1,1,7,1)
+    grid.addWidget(logs,6,2,2,2)
     #grid.addWidget(menu_kingdom,1,2)
-    grid.addWidget(menu_regions,1,2)
-    grid.addWidget(button_init,2,2)
-    #grid.addWidget(button,2,3)
+    grid.addWidget(menu_regions,3,2,1,2)
+    grid.addWidget(button_init,5,2,1,2)
+    grid.addWidget(button_select,2,2,1,1)
+    grid.addWidget(freetext,4,2,1,1)
+    grid.addWidget(label_menu,1,2,1,1)
+
 
     win.setLayout(grid)
-    win.setGeometry(300,300,800,300)
+    win.setGeometry(300,300,1000,300)
     win.setWindowTitle("Logiciel Bioinformatique")
     win.show()
     button_init.initialisation()
