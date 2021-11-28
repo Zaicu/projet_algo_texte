@@ -3,8 +3,8 @@ import os
 import time
 import platform
 import inspect
-from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel, QDialog, QProgressDialog
-from PyQt5.QtCore import QModelIndex, QRunnable, QThreadPool, QThread, pyqtSignal, Qt, QThread
+from PyQt5.QtWidgets import QApplication, QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QGridLayout, QRadioButton, QPushButton, QLabel, QDialog, QProgressDialog, QButtonGroup
+from PyQt5.QtCore import QModelIndex, QRunnable, QThreadPool, QThread, pyqtSignal, Qt, QThread, QObject
 
 src_file_path = inspect.getfile(lambda: None)
 root_dir = os.path.dirname(os.path.realpath(src_file_path))
@@ -55,23 +55,29 @@ class Menu(QWidget):
         super().__init__()
         layout = QGridLayout()
         self.setLayout(layout)
+        regions_group = QButtonGroup(self)
         for i in range(len(list)):
             content = list.pop()
             radiobutton=QRadioButton(content)
             if i==0 :
                 radiobutton.setChecked(True)
-                self.content = content
+                self.content = [content]
             radiobutton.content = content
             radiobutton.toggled.connect(self.onClicked)
             layout.addWidget(radiobutton, i, 0)
+            regions_group.addButton(radiobutton)
+        regions_group.setExclusive(False)
 
 
     def onClicked(self):
         radioButton = self.sender()
-        self.content = radioButton.content
+        if self.sender().isChecked():
+            self.content+=[radioButton.content]
+        else :
+            self.content.remove(radioButton.content)
 
 
-
+'''
 class Button(QWidget):
     def __init__(self,menu1,menu2):
         super().__init__()
@@ -92,9 +98,9 @@ class Button(QWidget):
     def parse(self) :
         if(tree.path != "blank"):
             logs.write_parse(tree.path+ " - ",menu_regions.content)
-            parse([menu_regions.content,tree.content])
+            associate([menu_regions.content,tree.content])
             logs.write("Parsing terminé")
-
+'''
 
 class Button_init(QWidget):
 
@@ -116,15 +122,20 @@ class Button_init(QWidget):
         self.setLayout(layout)
         self.threadpool = QThreadPool()
 
+    def process_results(self,tuple):
+        self.list_init=tuple
+
     def initialisation(self):
         logs.write("Please wait during the download")
-        worker = Worker()
-        self.threadpool.start(worker)
+        init_worker = Worker()
+        self.threadpool.start(init_worker)
+        #self.threadpool.waitForDone()
+        init_worker.signals.result.connect(self.process_results)
 
     def parse(self) :
         if(tree.path != "blank"):
             logs.write_parse(tree.path+ " - ",menu_regions.content)
-            parse([menu_regions.content,tree.content])
+            associate([menu_regions.content,tree.content])
             logs.write("Parsing terminé")
         '''logs.write("Please wait during the parsing")
         #th_init = threading.Thread(target=init,args=([],root_dir))
@@ -134,12 +145,21 @@ class Button_init(QWidget):
         worker = Worker()
         self.threadpool.start(worker)'''
 
-
+class WorkerSignals(QObject):
+    result = pyqtSignal(list)
 
 class Worker(QRunnable):
+    def __init__(self):
+        super(Worker, self).__init__()
+        self.signals = WorkerSignals()
+
     def run(self):
-        self.tuple=init(logs, prgss)
+        self.ids, self.path, self.dates=init(logs, prgss)
+        self.list= [self.ids, self.path, self.dates]
         time.sleep(5)
+        self.signals.result.emit(self.list)
+
+
 
 class Logs(QWidget):
     def __init__(self):
@@ -201,11 +221,11 @@ class ProgressBar(QProgressDialog):
         self.show()
 
     def update(self, value):
-        print(value)
         self.setValue(value)
         self.show()
         if value==100:
-           self.close()
+            self.setVisible(False)
+            self.close()
 
     #def close(self):
     #    print("allo",self.wasCanceled())
@@ -262,7 +282,7 @@ if __name__ == '__main__':
     #grid.addWidget(button,2,3)
 
     win.setLayout(grid)
-    win.setGeometry(50,50,100,200)
+    win.setGeometry(300,300,800,300)
     win.setWindowTitle("Logiciel Bioinformatique")
     win.show()
     button_init.initialisation()
