@@ -230,7 +230,7 @@ class Worker_parse(QRunnable):
         self.regions=regions
 
     def run(self):
-        associate(self.list_init[0], self.list_init[1], self.list_init[2],self.tree,self.regions)
+        associate(self.list_init[0], self.list_init[1], self.list_init[2],self.tree,self.regions, prgss_parsing)
         time.sleep(5)
         self.signal.finished.emit()
 
@@ -295,7 +295,7 @@ class ProgressBar(QProgressDialog):
     signal_update=pyqtSignal(int)
 
     def __init__(self, max):
-        print("init")
+        #print("init")
         super().__init__()
         self.setMinimumDuration(0) # Sets how long the loop should last before progress bar is shown (in miliseconds)
         self.setWindowTitle("Creating directories")
@@ -324,6 +324,28 @@ class ProgressBar(QProgressDialog):
     #    self.close()
     #    self.setVisible(False)
 
+class ProgressBar_parsing(QProgressDialog):
+    signal_update=pyqtSignal(int)
+
+    def __init__(self, max):
+        super().__init__()
+        self.setMinimumDuration(0) # Sets how long the loop should last before progress bar is shown (in miliseconds)
+        self.setWindowTitle("Parsing")
+        self.setModal(True)
+
+        self.setValue(0)
+        self.setMinimum(0)
+        self.setMaximum(max)
+        self.signal_update.connect(self.update)
+        self.resize(300,100)
+        self.show()
+
+    def update(self, value):
+        self.setValue(value)
+        self.show()
+        if value==100:
+            self.setVisible(False)
+            #self.close()
 
 if __name__ == '__main__':
     if not os.path.isdir(root_dir + SEP+ "GENOME_REPORTS"):
@@ -344,6 +366,10 @@ if __name__ == '__main__':
     logs = Logs()
     prgss = ProgressBar(100)
     prgss.setVisible(False)
+
+    prgss_parsing = ProgressBar(100)
+    prgss_parsing.setVisible(False)
+
     freetext = FreeText()
 
     button_select = Button_regions(menu_regions)
