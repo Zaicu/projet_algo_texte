@@ -264,39 +264,66 @@ class Coordinate:
 		# Vérifier que le min et max sont bien dans la longueur de la séquence, et que min < max
 		if coord_parse != coord:
 			coord_parse = coord_parse.split("\t")
-			min = int(coord_parse[0])
-			max = int(coord_parse[1])
+			self.min = int(coord_parse[0])
+			self.max = int(coord_parse[1])
 			if coord_parse[2] == "+":
-				complement = False
+				self.complement = False
 			else:
-				complement = True
-			if min >= max or max > len_record:
-				min        = None
-				max        = None
-				complement = None
+				self.complement = True
+			if self.min >= self.max or self.max > len_record or self.min < 0:
+				self.min        = None
+				self.max        = None
+				self.complement = None
 
 		else:
-			min        = None
-			max        = None
-			complement = None
+			self.min        = None
+			self.max        = None
+			self.complement = None
 		# reverse_complement(), regarder le tutorial sur le site internet https://www.tutorialspoint.com/biopython/biopython_advanced_sequence_operations.htm
+
+	def write(self, file, name_file, gb_record):
+		if self.complement:
+			seq = gb_record.seq[self.min:self.max].reverse_complement()
+		else:
+			seq = gb_record.seq[self.min:self.max]
+		header = f"{name_file}\t{'complement(' if self.complement else ''}{self.min}..{self.max}{')' if self.complement else ''}\n"
+		file.write(header)
+		file.write(str(seq) + '\n\n')
+
+
 
 class Location:
 	def __init__(self, loc, len_record):
+		self.loc = loc
 		loc_parse = re.sub('join{(.*)}', "\g<1>", loc)
 
 		if loc_parse == loc:
-			coordinate = Coordinate(loc, len_record)
-			join       = False
+			self.coordinate = [Coordinate(loc, len_record)]
+			self.join       = False
 
 		else:
 			coord_tab  = loc_parse.replace(" ","").split(",")
-			coordinate = []
+			self.coordinate = []
 			for coord in coord_tab:
-				coordinate.append(Coordinate(coord, len_record))
-			join       = True
+				self.coordinate.append(Coordinate(coord, len_record))
+			self.join       = True
 
 		#si join == True, alors vérifier que les séquences du join ne s'entrecroisent pas
+
+	def write(self, file, name_file, gb_record):
+		if self.join:
+			name_file = name_file + "\t" + self.loc
+			print("join")
+		else:
+			print("not join")
+
+		for coord in self.coordinate: # Si y en a un qui fait n'importe quoi
+			if coord.min == None or coord.max == None or coord.complement == None:
+				return
+
+		for coord in self.coordinate:
+			coord.write(file, name_file, gb_record)
+
 
 
 def write_seq(file_path, gb_record, group):
@@ -304,6 +331,7 @@ def write_seq(file_path, gb_record, group):
 	#new_stdout = io.StringIO()
 	#sys.stdout = new_stdout
 	file           = open(file_path, "w")
+	name_file      = os.path.basename(file_path)[:-4]
 	function_group = []
 	features       = gb_record.features
 	len_record     = len(gb_record.seq)
@@ -313,21 +341,7 @@ def write_seq(file_path, gb_record, group):
 			loc = str(f.location)
 			print(loc)
 			location = Location(loc, len_record)
-			coord = parse_location(loc)
-			coord = coord.split(' ')
-			int_coord = []
-			for num in coord:
-				int_coord.append(int(num))
-			if not "join" in loc and not "complement" in loc:
-				inf, sup = min(int_coord), max(int_coord)
-				file.write("%s\t%d..%d\n" % (f.type, inf, sup))
-				file.write(str(gb_record.seq[inf:sup]) + '\n\n')
-			if "complement" in loc and not "join" in loc:
-				inf, sup = min(int_coord), max(int_coord)
-				file.write("%s\tcomplement(%d..%d)\n" % (f.type, inf, sup))
-				file.write(str(gb_record.seq[inf:sup]) + '\n\n')
-			if "join" in loc:
-				join(int_coord, gb_record.seq, f, file)
+			location.write(file, name_file, gb_record)
 	#output = new_stdout.getvalue()
 	#print(output)
 	#sys.stdout = old_stdout
@@ -380,8 +394,9 @@ def parsing(data):
 		print(function_group)
 
 		for group in function_group:
-			print(os.path.join(path, group + " " + organism_name + " " + entity_id + ".txt"))
-			write_seq(os.path.join(path, group + " " + organism_name + " " + entity_id + ".txt"), seq_record, group) #le seq_record il faut le réduire pour qu'il corresponde au group uniquement (pour le moment je le garde en entier et je traite dans write_seq)
+			os.makedirs(os.path.join(path, group))
+			print(os.path.join(path, group, group + " " + organism_name + " " + entity_id + ".txt"))
+			write_seq(os.path.join(path, group, group + " " + organism_name + " " + entity_id + ".txt"), seq_record, group) #le seq_record il faut le réduire pour qu'il corresponde au group uniquement (pour le moment je le garde en entier et je traite dans write_seq)
 
 		lock.acquire(blocking=True)
 		today = open("today", "a")
@@ -618,7 +633,7 @@ def init(logs, prgss, filtre=['']):
 
 	# A retirer après
 
-	associate(ids, paths, dates, os.path.join("Results"), ["CDS", "centromere", "intron", "mobile_element", "ncRNA", "rRNA", "telomere", "tRNA", "3'UTR", "5'UTR"])
+	#associate(ids, paths, dates, os.path.join("Results"), ["CDS", "centromere", "intron", "mobile_element", "ncRNA", "rRNA", "telomere", "tRNA", "3'UTR", "5'UTR"])
 	# os.path.join("Results", "Bacteria", "Terrabacteria_group")
 	# os.path.join("Results","Viruses","Other","Geminiviridae") crash
 
