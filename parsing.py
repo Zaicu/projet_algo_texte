@@ -19,6 +19,10 @@ if platform.system() == "Windows": SEP = "\\"
 else: SEP = "/"
 
 lock = threading.Lock()
+lock_time = threading.Lock()
+
+parsing_advancement = 0
+lenght = 0
 
 def download_file(url, dir, logs):
 	if not os.path.isdir(dir):
@@ -282,6 +286,8 @@ class Coordinate:
 		# reverse_complement(), regarder le tutorial sur le site internet https://www.tutorialspoint.com/biopython/biopython_advanced_sequence_operations.htm
 
 	def write(self, file, name_file, gb_record):
+		if 'N' in gb_record.seq[self.min:self.max]:
+			return
 		if self.complement:
 			seq = gb_record.seq[self.min:self.max].reverse_complement()
 		else:
@@ -289,12 +295,14 @@ class Coordinate:
 		header = f"{name_file}\t{'complement(' if self.complement else ''}{self.min}..{self.max}{')' if self.complement else ''}\n"
 		file.write(header)
 		file.write(str(seq) + '\n\n')
+		#/home/thomas/projet_algo_texte/Results/Archaea/Candidatus_Thermoplasmatota/Thermoplasmata/Picrophilus_oshimae/CDS
 
 
 
 class Location:
 	def __init__(self, loc, len_record):
 		self.loc = loc
+		self.intron = []
 		loc_parse = re.sub('join{(.*)}', "\g<1>", loc)
 
 		if loc_parse == loc:
@@ -307,6 +315,14 @@ class Location:
 			for coord in coord_tab:
 				self.coordinate.append(Coordinate(coord, len_record))
 			self.join       = True
+
+			#self.good = True
+			#for i in range(len(self.coordinate)):
+			#	for j in range(len(self.coordinate)):
+			#		if i != j and self.good:
+			#			self.good = self.coordinate[i].good(self.coordinate[j])
+
+
 
 		#si join == True, alors vérifier que les séquences du join ne s'entrecroisent pas
 
@@ -324,6 +340,25 @@ class Location:
 		for coord in self.coordinate:
 			coord.write(file, name_file, gb_record)
 
+	def write_intron(self, file, name_file, gb_record, len_record):
+		print(name_file)
+		if not self.join:# or not self.good:
+			return
+
+		if len(self.coordinate) == 2:
+			str = f"[{self.coordinate[0].max}..{self.coordinate[1].min}](+)"
+		else:
+			str = "join("
+			for i in range(len(self.coordinate)-1):
+				if i != 0:
+					str = str + ","
+				str = str + f"[{self.coordinate[i].max}..{self.coordinate[i+1].min}](+)"
+
+			str = str + ")"
+		loc = Location(str, len_record)
+		loc.write(file, name_file.replace('CDS', "intron"), gb_record)
+
+
 
 
 def write_seq(file_path, gb_record, group):
@@ -339,9 +374,16 @@ def write_seq(file_path, gb_record, group):
 	for f in features:
 		if f.type == group:
 			loc = str(f.location)
-			print(loc)
+			#print(loc)
 			location = Location(loc, len_record)
 			location.write(file, name_file, gb_record)
+		if f.type == "CDS" and group == "intron":
+			loc = str(f.location)
+			#print(loc)
+			location = Location(loc, len_record)
+			location.write_intron(file, name_file, gb_record, len_record)
+
+
 	#output = new_stdout.getvalue()
 	#print(output)
 	#sys.stdout = old_stdout
@@ -353,18 +395,23 @@ def parsing(data):
 	reduced_dates = data[2]
 	today_ids     = data[3]
 	list_group    = data[4]
+	prgss_parsing = data[5]
 
-	i = 0
+	global parsing_advancement
+	global length
 	print("reduced_ids : ", len(reduced_ids))
 	print("reduced_paths : ", len(reduced_paths))
 	print("reduced_dates : ", len(reduced_dates))
-	lenght = len(reduced_ids)
 	#handle = Entrez.efetch(db="nucleotide", rettype="gb", retmode="text", id=ids)
 	fgroup = ""
 	for entity_id, path, date in zip(reduced_ids, reduced_paths, reduced_dates):
 
-		i = i + 1
-		print(f'{i}/{lenght}')
+		lock_time.acquire(blocking=True)
+		parsing_advancement = parsing_advancement + 1
+		prgss_parsing.setVisible(True)
+		prgss_parsing.signal_update.emit(100*(parsing_advancement/lenght))
+		print(f'{parsing_advancement}/{lenght}')
+		lock_time.release()
 
 		if entity_id in today_ids: #faut changer le truc des dates et faire par group aussi
 			continue
@@ -409,15 +456,18 @@ def parsing(data):
 		#print(paths[i] + '\t' +entity_id + functiongroup, file=index)
 	return
 
-def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, list_group, func):
+def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, list_group, prgss_parsing, func):
 	cores = 2 #Number of CPU cores on your system
 	partitions = cores #Define as many partitions as you want
 	# export CLOUDSDK_PYTHON=/usr/bin/python3.7
 
+	global lenght
+	lenght = len(reduced_ids)
+
 	reduced_ids_split   = np.array_split(reduced_ids  , partitions)
 	reduced_paths_split = np.array_split(reduced_paths, partitions)
 	reduced_dates_split = np.array_split(reduced_dates, partitions)
-	data_split = [(reduced_ids, reduced_paths, reduced_dates, today_ids, list_group) for (reduced_ids, reduced_paths, reduced_dates) in zip(reduced_ids_split, reduced_paths_split, reduced_dates_split)]
+	data_split = [(reduced_ids, reduced_paths, reduced_dates, today_ids, list_group, prgss_parsing) for (reduced_ids, reduced_paths, reduced_dates) in zip(reduced_ids_split, reduced_paths_split, reduced_dates_split)]
 
 	# Create new threads
 	thread1 = myThread(1, "Thread-1", data_split[0])
@@ -436,7 +486,7 @@ def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, list_group
 
 	return
 
-def associate(ids, paths, dates, directory_parsing, list_group):
+def associate(ids, paths, dates, directory_parsing, list_group, prgss_parsing):
 	ids    = ids.split(',')
 	paths  = paths.split(',')
 	dates  = dates.split(',')
@@ -478,7 +528,7 @@ def associate(ids, paths, dates, directory_parsing, list_group):
 	#today = open("today", "a")
 
 	#Parsing
-	parallelize(np.array(reduced_ids), np.array(reduced_paths), np.array(reduced_dates), today_ids, list_group, parsing)
+	parallelize(np.array(reduced_ids), np.array(reduced_paths), np.array(reduced_dates), today_ids, list_group, prgss_parsing, parsing)
 
 	#today.close()
 	#tab_group = fgroup.split(',')
@@ -652,5 +702,5 @@ if __name__ == "__main__":
 	if not ids == "":
 		print("ok")
 		list_group = ["CDS", "centromere", "intron", "mobile_element", "ncRNA", "rRNA", "telomere", "tRNA", "3'UTR", "5'UTR"]
-		associate(ids, paths, dates, directory_parsing, list_group)
+		associate(ids, paths, dates, directory_parsing, list_group, prgss_parsing)
 	#parse(['tRNA'])
