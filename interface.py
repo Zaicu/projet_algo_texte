@@ -199,7 +199,7 @@ class Button_init(QWidget):
 
 
     def finished(self):
-        logs.write("Parsing terminé")
+        logs.write("Finished parsing")
 
 class WorkerSignals(QObject):
     result = pyqtSignal(list)
