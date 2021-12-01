@@ -297,12 +297,18 @@ class Coordinate:
 		file.write(str(seq) + '\n\n')
 		#/home/thomas/projet_algo_texte/Results/Archaea/Candidatus_Thermoplasmatota/Thermoplasmata/Picrophilus_oshimae/CDS
 
+	def good(self, coord):
+		if self.max == None or self.min == None or coord.min == None or coord.max == None:
+			return False
+		return (self.max <= coord.min and self.min < coord.min) or (self.max > coord.max and self.min >= coord.max)
+
 
 
 class Location:
 	def __init__(self, loc, len_record):
 		self.loc = loc
 		self.intron = []
+		self.good = True
 		loc_parse = re.sub('join{(.*)}', "\g<1>", loc)
 
 		if loc_parse == loc:
@@ -316,17 +322,19 @@ class Location:
 				self.coordinate.append(Coordinate(coord, len_record))
 			self.join       = True
 
-			#self.good = True
-			#for i in range(len(self.coordinate)):
-			#	for j in range(len(self.coordinate)):
-			#		if i != j and self.good:
-			#			self.good = self.coordinate[i].good(self.coordinate[j])
+			for i in range(len(self.coordinate)):
+				for j in range(len(self.coordinate)):
+					if i != j and self.good:
+						self.good = self.coordinate[i].good(self.coordinate[j])
 
 
 
 		#si join == True, alors vérifier que les séquences du join ne s'entrecroisent pas
 
 	def write(self, file, name_file, gb_record):
+		if not self.good:
+			return
+
 		if self.join:
 			name_file = name_file + "\t" + self.loc
 			print("join")
@@ -342,7 +350,7 @@ class Location:
 
 	def write_intron(self, file, name_file, gb_record, len_record):
 		print(name_file)
-		if not self.join:# or not self.good:
+		if not self.join or not self.good:
 			return
 
 		if len(self.coordinate) == 2:
