@@ -126,6 +126,7 @@ class Button_init(QWidget):
         self.entree = QPushButton('Parse', self)
         self.entree.setCheckable(True)
         self.text = text.qle
+        self.no = 0
 
         self.entree.clicked.connect(self.parse)
         self.entree.setStyleSheet("margin: 1px; padding: 10px; \
@@ -140,7 +141,9 @@ class Button_init(QWidget):
 
     def process_results(self,tuple):
         self.list_init=tuple
+        logs.write("Tree Done")
         logs.write("You can now parse")
+        self.no=1
         #print(self.list_init)
 
     def initialisation(self):
@@ -151,51 +154,57 @@ class Button_init(QWidget):
         init_worker.signals.result.connect(self.process_results)
 
     def parse(self) :
-        if(tree.path != "blank"):
-            to_write =''
-            for i in range(len(menu_regions.content)):
-                if i==len(menu_regions.content)-1:
-                    to_write+=menu_regions.content[i]
+        if self.no==1:
+            self.no=0
+            if(tree.path != "blank"):
+                to_write =''
+                for i in range(len(menu_regions.content)):
+                    if i==len(menu_regions.content)-1:
+                        to_write+=menu_regions.content[i]
+                    else:
+                        to_write+=menu_regions.content[i]+", "
+                if self.text.text():
+                    if len(menu_regions.content)==0:
+                        to_write+=self.text.text()
+                    else:
+                        to_write+=", "+self.text.text()
+                logs.write_parse(tree.path+ " - ",to_write)
+                parse_worker = Worker_parse()
+                if self.text.text():
+                    parse_worker.set_param(self.list_init,tree.content,menu_regions.content+[self.text.text()])
                 else:
-                    to_write+=menu_regions.content[i]+", "
-            if self.text.text():
-                if len(menu_regions.content)==0:
-                    to_write+=self.text.text()
-                else:
-                    to_write+=", "+self.text.text()
-            logs.write_parse(tree.path+ " - ",to_write)
-            parse_worker = Worker_parse()
-            if self.text.text():
-                parse_worker.set_param(self.list_init,tree.content,menu_regions.content+[self.text.text()])
-            else:
-                parse_worker.set_param(self.list_init,tree.content,menu_regions.content)
-            self.threadpool.start(parse_worker)
-            parse_worker.signal.finished.connect(self.finished)
+                    parse_worker.set_param(self.list_init,tree.content,menu_regions.content)
+                self.threadpool.start(parse_worker)
+                parse_worker.signal.finished.connect(self.finished)
+                self.no=1
 
+            else:
+                to_write =''
+                for i in range(len(menu_regions.content)):
+                    if i==len(menu_regions.content)-1:
+                        to_write+=menu_regions.content[i]
+                    else:
+                        to_write+=menu_regions.content[i]+", "
+                if self.text.text():
+                    if len(menu_regions.content)==0:
+                        to_write+=self.text.text()
+                    else:
+                        to_write+=", "+self.text.text()
+                logs.write_parse("Archaea, Bacteria, Eukaryota, Viruses"+ " - ",to_write)
+                parse_worker = Worker_parse()
+                if self.text.text():
+                    parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content+[self.text.text()])
+                else:
+                    parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content)
+
+                self.threadpool.start(parse_worker)
+                parse_worker.signal.finished.connect(self.finished)
+                self.no=1
+                #self.threadpool.waitForDone()
+                #associate(self.list_init[0], self.list_init[1], self.list_init[2],tree.content,menu_regions.content)
+                #associate([menu_regions.content,tree.content])
         else:
-            to_write =''
-            for i in range(len(menu_regions.content)):
-                if i==len(menu_regions.content)-1:
-                    to_write+=menu_regions.content[i]
-                else:
-                    to_write+=menu_regions.content[i]+", "
-            if self.text.text():
-                if len(menu_regions.content)==0:
-                    to_write+=self.text.text()
-                else:
-                    to_write+=", "+self.text.text()
-            logs.write_parse("Archaea, Bacteria, Eukaryota, Viruses"+ " - ",to_write)
-            parse_worker = Worker_parse()
-            if self.text.text():
-                parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content+[self.text.text()])
-            else:
-                parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content)
-
-            self.threadpool.start(parse_worker)
-            parse_worker.signal.finished.connect(self.finished)
-            #self.threadpool.waitForDone()
-            #associate(self.list_init[0], self.list_init[1], self.list_init[2],tree.content,menu_regions.content)
-            #associate([menu_regions.content,tree.content])
+            logs.write("You can't parse yet !")
 
 
     def finished(self):
@@ -375,6 +384,7 @@ if __name__ == '__main__':
     button_select = Button_regions(menu_regions)
     button_init = Button_init(tree, menu_regions, freetext)
     label_menu = QLabel("Select one or several region(s) :")
+    no=0
 
     grid.addWidget(tree,1,1,7,1)
     grid.addWidget(logs,6,2,2,2)
