@@ -367,7 +367,7 @@ if __name__ == '__main__':
     prgss = ProgressBar(100)
     prgss.setVisible(False)
 
-    prgss_parsing = ProgressBar(100)
+    prgss_parsing = ProgressBar_parsing(100)
     prgss_parsing.setVisible(False)
 
     freetext = FreeText()
