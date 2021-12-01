@@ -166,9 +166,9 @@ class Button_init(QWidget):
             logs.write_parse(tree.path+ " - ",to_write)
             parse_worker = Worker_parse()
             if self.text.text():
-                parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content+[self.text.text()])
+                parse_worker.set_param(self.list_init,tree.content,menu_regions.content+[self.text.text()])
             else:
-                parse_worker.set_param(self.list_init,os.path.join("Results"),menu_regions.content)
+                parse_worker.set_param(self.list_init,tree.content,menu_regions.content)
             self.threadpool.start(parse_worker)
             parse_worker.signal.finished.connect(self.finished)
 
