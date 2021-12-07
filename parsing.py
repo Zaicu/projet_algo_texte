@@ -287,7 +287,7 @@ class Coordinate:
 
 	def write(self, file, name_file, gb_record):
 		if 'N' in gb_record.seq[self.min:self.max]:
-			return
+			return ""
 		if self.complement:
 			seq = gb_record.seq[self.min:self.max].reverse_complement()
 		else:
@@ -295,6 +295,7 @@ class Coordinate:
 		header = f"{name_file}\t{'complement(' if self.complement else ''}{self.min}..{self.max}{')' if self.complement else ''}\n"
 		file.write(header)
 		file.write(str(seq) + '\n\n')
+		return str(seq)
 		#/home/thomas/projet_algo_texte/Results/Archaea/Candidatus_Thermoplasmatota/Thermoplasmata/Picrophilus_oshimae/CDS
 
 	def good(self, coord):
@@ -345,8 +346,12 @@ class Location:
 			if coord.min == None or coord.max == None or coord.complement == None:
 				return
 
+		seq = ""
 		for coord in self.coordinate:
-			coord.write(file, name_file, gb_record)
+			seq = seq + coord.write(file, name_file, gb_record)
+
+		if self.join and seq != "":
+			file.write(f"{name_file}\n{seq}\n\n")
 
 	def write_intron(self, file, name_file, gb_record, len_record):
 		print(name_file)
@@ -414,6 +419,10 @@ def parsing(data):
 	fgroup = ""
 	for entity_id, path, date in zip(reduced_ids, reduced_paths, reduced_dates):
 
+		if prgss_parsing.wasCanceled():
+			prgss_parsing.reset()
+			prgss_parsing.close()
+			return
 		lock_time.acquire(blocking=True)
 		parsing_advancement = parsing_advancement + 1
 		prgss_parsing.setVisible(True)
@@ -577,7 +586,8 @@ def create_tree(overview_lines, ids_files, logs, prgss):
 		index = open('index.txt', 'r')
 		for line in index.readlines():
 			#append le NC dans all_entity_id
-			entity_id = line.split('\t')[1].split('\n')[0]
+			if len(line.split('\t')) > 1:
+				entity_id = line.split('\t')[1].split('\n')[0]
 			#print(os.listdir(path))
 			all_entity_id.append(entity_id)
 		index.close()
@@ -687,7 +697,6 @@ def init(logs, prgss, filtre=['']):
 	kingdom  = -1
 
 	(ids, paths, dates) = create_tree(overview_lines, ids_files, logs, prgss)
-	logs.write("Tree done")
 
 	# A retirer après
 
