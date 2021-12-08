@@ -294,7 +294,7 @@ class Coordinate:
 			seq = gb_record.seq[self.min:self.max]
 		header = f"{name_file}\t{'complement(' if self.complement else ''}{self.min}..{self.max}{')' if self.complement else ''}\n"
 		file.write(header)
-		file.write(str(seq) + '\n\n')
+		file.write(str(seq) + '\n')
 		return str(seq)
 		#/home/thomas/projet_algo_texte/Results/Archaea/Candidatus_Thermoplasmatota/Thermoplasmata/Picrophilus_oshimae/CDS
 
@@ -351,25 +351,53 @@ class Location:
 			seq = seq + coord.write(file, name_file, gb_record)
 
 		if self.join and seq != "":
-			file.write(f"{name_file}\n{seq}\n\n")
+			file.write(f"{name_file}\n{seq}\n")
 
 	def write_intron(self, file, name_file, gb_record, len_record):
 		print(name_file)
 		if not self.join or not self.good:
+			print("Is not an Intron from a join of a CDS\n")
+			print(self.join)
+			print(self.good)
 			return
 
+		name_file = name_file + "\t" + self.loc
+		print(name_file)
+
 		if len(self.coordinate) == 2:
-			str = f"[{self.coordinate[0].max}..{self.coordinate[1].min}](+)"
+			if self.coordinate[0].max < self.coordinate[1].min:
+				str = f"[{self.coordinate[0].max}:{self.coordinate[1].min}](+)"
+			else:
+				str = f"[{self.coordinate[1].max}:{self.coordinate[0].min}](-)"
 		else:
-			str = "join("
+			str = "join{"
 			for i in range(len(self.coordinate)-1):
 				if i != 0:
-					str = str + ","
-				str = str + f"[{self.coordinate[i].max}..{self.coordinate[i+1].min}](+)"
+					str = str + ", "
+				if self.coordinate[i].max < self.coordinate[i+1].min:
+					str = str + f"[{self.coordinate[i].max}:{self.coordinate[i+1].min}](+)"
+				else:
+					str = str + f"[{self.coordinate[i+1].max}:{self.coordinate[i].min}](-)"
 
-			str = str + ")"
+			str = str + "}"
+		print(str)
 		loc = Location(str, len_record)
-		loc.write(file, name_file.replace('CDS', "intron"), gb_record)
+		print(loc.join)
+		print(loc.good)
+
+		for coord in loc.coordinate: # Si y en a un qui fait n'importe quoi
+			if coord.min == None or coord.max == None or coord.complement == None:
+				print("ahahahahahah")
+				return
+
+		seq = ""
+		for coord in loc.coordinate:
+			seq = seq + coord.write(file, name_file, gb_record)
+
+		if loc.join and seq != "":
+			file.write(f"{name_file}\n{seq}\n")
+
+		#loc.write(file, name_file, gb_record)
 
 
 
@@ -394,6 +422,7 @@ def write_seq(file_path, gb_record, group):
 			loc = str(f.location)
 			#print(loc)
 			location = Location(loc, len_record)
+			print(f"location {loc}")
 			location.write_intron(file, name_file, gb_record, len_record)
 
 
