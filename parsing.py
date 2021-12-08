@@ -286,12 +286,14 @@ class Coordinate:
 		# reverse_complement(), regarder le tutorial sur le site internet https://www.tutorialspoint.com/biopython/biopython_advanced_sequence_operations.htm
 
 	def write(self, file, name_file, gb_record):
-		if 'N' in gb_record.seq[self.min:self.max]:
+		print(self.min)
+		print(self.max)
+		print(len(gb_record.seq))
+		seq = gb_record.seq[self.min:self.max]
+		if 'N' in seq:
 			return ""
 		if self.complement:
-			seq = gb_record.seq[self.min:self.max].reverse_complement()
-		else:
-			seq = gb_record.seq[self.min:self.max]
+			seq = seq.reverse_complement()
 		header = f"{name_file}\t{'complement(' if self.complement else ''}{self.min}..{self.max}{')' if self.complement else ''}\n"
 		file.write(header)
 		file.write(str(seq) + '\n')
