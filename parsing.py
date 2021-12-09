@@ -286,18 +286,29 @@ class Coordinate:
 		# reverse_complement(), regarder le tutorial sur le site internet https://www.tutorialspoint.com/biopython/biopython_advanced_sequence_operations.htm
 
 	def write(self, file, name_file, gb_record):
-		print(self.min)
-		print(self.max)
-		print(len(gb_record.seq))
-		seq = gb_record.seq[self.min:self.max]
-		if 'N' in seq:
+		is_undefined = False
+		try:
+			bytes(gb_record.seq)
+		except Exception as e:
+			is_undefined = True
+		if is_undefined:
 			return ""
+
+		if 'N' in gb_record.seq[self.min:self.max]:
+			return ""
+
 		if self.complement:
-			seq = seq.reverse_complement()
+			seq = gb_record.seq[self.min:self.max].reverse_complement()
+		else:
+			seq = gb_record.seq[self.min:self.max]
+		try:
+			seq = seq.tostring()
+		except AttributeError:
+			seq = str(seq)
 		header = f"{name_file}\t{'complement(' if self.complement else ''}{self.min}..{self.max}{')' if self.complement else ''}\n"
 		file.write(header)
-		file.write(str(seq) + '\n')
-		return str(seq)
+		file.write(seq + '\n')
+		return seq
 		#/home/thomas/projet_algo_texte/Results/Archaea/Candidatus_Thermoplasmatota/Thermoplasmata/Picrophilus_oshimae/CDS
 
 	def good(self, coord):
@@ -434,6 +445,10 @@ def write_seq(file_path, gb_record, group):
 	file.close()
 
 def parsing(data):
+	global parsing_advancement
+	global length
+	global lock
+	global lock_time
 	reduced_ids   = data[0]
 	reduced_paths = data[1]
 	reduced_dates = data[2]
@@ -441,8 +456,7 @@ def parsing(data):
 	list_group    = data[4]
 	prgss_parsing = data[5]
 
-	global parsing_advancement
-	global length
+
 	print("reduced_ids : ", len(reduced_ids))
 	print("reduced_paths : ", len(reduced_paths))
 	print("reduced_dates : ", len(reduced_dates))
@@ -505,7 +519,7 @@ def parsing(data):
 	return
 
 def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, list_group, prgss_parsing, func):
-	cores = 2 #Number of CPU cores on your system
+	cores = 1 #Number of CPU cores on your system
 	partitions = cores #Define as many partitions as you want
 	# export CLOUDSDK_PYTHON=/usr/bin/python3.7
 
@@ -519,17 +533,17 @@ def parallelize(reduced_ids, reduced_paths, reduced_dates, today_ids, list_group
 
 	# Create new threads
 	thread1 = myThread(1, "Thread-1", data_split[0])
-	thread2 = myThread(2, "Thread-2", data_split[1])
+	#thread2 = myThread(2, "Thread-2", data_split[1])
 	#thread3 = myThread(3, "Thread-3", data_split[2])
 
 	# Start new Threads
 	thread1.start()
-	thread2.start()
+	#thread2.start()
 	#thread3.start()
 
 	# Wait for the threads
 	thread1.join()
-	thread2.join()
+	#thread2.join()
 	#thread3.join()
 
 	return
